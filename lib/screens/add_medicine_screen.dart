@@ -1,0 +1,421 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:medi/models/medicine.dart';
+import 'package:medi/providers/medicine_provider.dart';
+import 'package:medi/core/theme.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+
+class AddMedicineScreen extends StatefulWidget {
+  const AddMedicineScreen({super.key});
+
+  @override
+  State<AddMedicineScreen> createState() => _AddMedicineScreenState();
+}
+
+class _AddMedicineScreenState extends State<AddMedicineScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  String _selectedType = 'Pill';
+  final List<String> _types = ['Pill', 'Liquid', 'Injection', 'Tablet', 'Drop'];
+
+  final Set<String> _selectedTimeSlots = {}; // {'Morning', 'Noon', 'Night'}
+  String _selectedInstruction = 'Any Time'; // 'Before Meal', 'After Meal', 'Any Time'
+
+  DateTime _startDate = DateTime.now();
+  String _selectedDuration = '1 Month';
+  final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', '2 Months', '3 Months', '6 Months'];
+
+  File? _image;
+
+  DateTime get _calculatedEndDate {
+    switch (_selectedDuration) {
+      case '1 Week':
+        return _startDate.add(const Duration(days: 7));
+      case '2 Weeks':
+        return _startDate.add(const Duration(days: 14));
+      case '1 Month':
+        return DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+      case '2 Months':
+        return DateTime(_startDate.year, _startDate.month + 2, _startDate.day);
+      case '3 Months':
+        return DateTime(_startDate.year, _startDate.month + 3, _startDate.day);
+      case '6 Months':
+        return DateTime(_startDate.year, _startDate.month + 6, _startDate.day);
+      default:
+        return _startDate.add(const Duration(days: 30));
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _startDate) {
+      setState(() {
+        _startDate = picked;
+      });
+    }
+  }
+
+  void _saveMedicine() {
+    if (_formKey.currentState!.validate()) {
+      if (_selectedTimeSlots.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one time (Morning/Noon/Night)')),
+        );
+        return;
+      }
+
+      final medicine = Medicine(
+        id: const Uuid().v4(),
+        name: _nameController.text,
+        dosage: '',
+        type: _selectedType,
+        startTime: _startDate,
+        timeSlots: _selectedTimeSlots.toList(),
+        instruction: _selectedInstruction,
+        endDate: _calculatedEndDate,
+        imagePath: _image?.path,
+      );
+
+      Provider.of<MedicineProvider>(context, listen: false).addMedicine(medicine);
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medicine Added Successfully! 💊')),
+      );
+    }
+  }
+
+  Widget _buildFrequencyChip(String label) {
+    final isSelected = _selectedTimeSlots.contains(label);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedTimeSlots.remove(label);
+          } else {
+            _selectedTimeSlots.add(label);
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(Icons.check_circle, size: 18, color: Theme.of(context).primaryColor),
+              ),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Theme.of(context).primaryColor : AppTheme.textPrimary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionChip(String label) {
+    final isSelected = _selectedInstruction == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedInstruction = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Theme.of(context).primaryColor : AppTheme.textPrimary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Add Medicine')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Image Picker
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      shape: BoxShape.circle,
+                      boxShadow: AppTheme.neumorphicShadowInset,
+                    ),
+                    child: _image == null
+                        ? Icon(Icons.add_a_photo, size: 40, color: AppTheme.textSecondary)
+                        : ClipOval(
+                            child: Image.file(_image!, fit: BoxFit.cover),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Name
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppTheme.neumorphicShadowInset,
+                ),
+                child: TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Medicine Name',
+                    prefixIcon: Icon(Icons.medication, color: AppTheme.textSecondary),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  style: TextStyle(color: AppTheme.textPrimary),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter medicine name';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Type Dropdown
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppTheme.neumorphicShadowInset,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedType,
+                  decoration: InputDecoration(
+                    labelText: 'Type of Medicine',
+                    prefixIcon: Icon(Icons.category, color: AppTheme.textSecondary),
+                    border: InputBorder.none,
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+                  dropdownColor: AppTheme.surfaceColor,
+                  items: _types.map((String type) {
+                    return DropdownMenuItem<String>(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedType = newValue!;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Duration & Start Date Row (same height)
+              Row(
+                children: [
+                  // Start Date Picker
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        height: 60,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: AppTheme.neumorphicShadowInset,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: AppTheme.textSecondary, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Start Date',
+                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  ),
+                                  Text(
+                                    "${_startDate.day}/${_startDate.month}/${_startDate.year}",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Duration Dropdown
+                  Expanded(
+                    child: Container(
+                      height: 60,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: AppTheme.neumorphicShadowInset,
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedDuration,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                        ),
+                        style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+                        dropdownColor: AppTheme.surfaceColor,
+                        items: _durations.map((String duration) {
+                          return DropdownMenuItem<String>(
+                            value: duration,
+                            child: Text(duration),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedDuration = newValue!;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Ends: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Frequency Chips
+              Text('Frequency', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildFrequencyChip('Morning'),
+                  _buildFrequencyChip('Noon'),
+                  _buildFrequencyChip('Night'),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Instruction Chips
+              Text('When to Take', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                children: [
+                  _buildInstructionChip('Before Meal'),
+                  _buildInstructionChip('After Meal'),
+                  _buildInstructionChip('Any Time'),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Save Button
+              GestureDetector(
+                onTap: _saveMedicine,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Save Reminder',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
