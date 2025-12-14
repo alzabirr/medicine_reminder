@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'dart:ui' as dart_ui; // Added for ImageFilter
 import 'package:medi/models/medicine.dart'; // Added
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/screens/add_medicine_screen.dart';
+import 'package:medi/screens/medicine_details_screen.dart'; // Added
 import 'package:medi/widgets/medicine_card.dart';
 import 'package:medi/widgets/medicine_card.dart';
 import 'package:medi/core/transitions.dart';
@@ -59,8 +61,8 @@ class _HomeScreenState extends State<HomeScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // Filter medicines for selected day
-            final medicinesForDay = _getMedicinesForDay(_selectedDay, provider.medicines);
+            // Display medicines for selected day
+            final dailyMedicines = _getMedicinesForDay(_selectedDay, provider.medicines);
 
             return Column(
               children: [
@@ -195,15 +197,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Medicines List
               Expanded(
-                child: medicinesForDay.isEmpty
+                child: dailyMedicines.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.event_busy, size: 80, color: Colors.grey[300]),
+                            Icon(Icons.medication_outlined, size: 80, color: Colors.grey[300]),
                             const SizedBox(height: 16),
                             Text(
-                              'No medicines for ${_selectedDay.day}/${_selectedDay.month}',
+                              'No medicines for ${DateFormat('MMM d').format(_selectedDay)}',
                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: Colors.grey[400],
                                   ),
@@ -213,29 +215,63 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.only(bottom: 100),
-                        itemCount: medicinesForDay.length,
+                        itemCount: dailyMedicines.length,
                         itemBuilder: (context, index) {
-                          final medicine = medicinesForDay[index];
-
+                          final medicine = dailyMedicines[index];
+                          
                           return Dismissible(
                             key: Key(medicine.id),
-                            direction: DismissDirection.endToStart,
+                            direction: DismissDirection.horizontal,
+                            
+                            // Swipe Right (Take) Background
                             background: Container(
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              color: AppTheme.successColor,
+                              child: const Icon(Icons.check_circle, color: Colors.white, size: 32),
+                            ),
+                            
+                            // Swipe Left (Delete) Background
+                            secondaryBackground: Container(
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.symmetric(horizontal: 20),
                               color: Theme.of(context).colorScheme.error,
-                              child: const Icon(Icons.delete, color: Colors.white),
+                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
                             ),
-                            onDismissed: (direction) {
-                              provider.deleteMedicine(medicine.id);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('${medicine.name} deleted')),
-                              );
+                            
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                // Swipe Right: Mark as Taken
+                                provider.toggleTaken(medicine);
+                                return false; // Don't delete, just update state
+                              } else {
+                                // Swipe Left: Delete
+                                return true; // Yes, delete
+                              }
                             },
+                            
+                            onDismissed: (direction) {
+                              if (direction == DismissDirection.endToStart) {
+                                provider.deleteMedicine(medicine.id);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('${medicine.name} deleted')),
+                                );
+                              }
+                            },
+                            
                             child: MedicineCard(
                               medicine: medicine,
                               onTaken: () {
-                                provider.toggleTaken(medicine);
+                                 // Redundant but safe if card keeps callback
+                                 provider.toggleTaken(medicine);
+                              },
+                              onCardTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MedicineDetailsScreen(medicine: medicine),
+                                  ),
+                                );
                               },
                             ),
                           );
@@ -246,16 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            SlideUpRoute(page: const AddMedicineScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Add Med'),
-      ),
+
     );
   }
 

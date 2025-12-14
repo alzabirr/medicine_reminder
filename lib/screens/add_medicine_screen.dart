@@ -18,11 +18,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
 
-  String _selectedType = 'Pill';
-  final List<String> _types = ['Pill', 'Liquid', 'Injection', 'Tablet', 'Drop'];
+  String _selectedType = 'Tablet';
+  final List<String> _types = ['Pill', 'Tablet','Liquid', 'Injection', 'Drop'];
 
-  final Set<String> _selectedTimeSlots = {}; // {'Morning', 'Noon', 'Night'}
-  String _selectedInstruction = 'Any Time'; // 'Before Meal', 'After Meal', 'Any Time'
+  final Map<String, TimeOfDay> _selectedTimeSlots = {}; // {'Morning': TimeOfDay...}
+  String _selectedInstruction = 'After Meal'; // 'Before Meal', 'After Meal', 'Any Time'
 
   DateTime _startDate = DateTime.now();
   String _selectedDuration = '1 Month';
@@ -50,8 +50,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   Future<void> _pickImage() async {
+    _getImage(ImageSource.gallery);
+  }
+
+  Future<void> _getImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
       setState(() {
@@ -83,13 +87,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         return;
       }
 
+      final List<String> formattedTimeSlots = _selectedTimeSlots.entries.map((e) {
+        final time = e.value;
+        final timeString = time.format(context);
+        return '${e.key}: $timeString';
+      }).toList();
+
       final medicine = Medicine(
         id: const Uuid().v4(),
         name: _nameController.text,
         dosage: '',
         type: _selectedType,
         startTime: _startDate,
-        timeSlots: _selectedTimeSlots.toList(),
+        timeSlots: formattedTimeSlots,
         instruction: _selectedInstruction,
         endDate: _calculatedEndDate,
         imagePath: _image?.path,
@@ -105,22 +115,49 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   Widget _buildFrequencyChip(String label) {
-    final isSelected = _selectedTimeSlots.contains(label);
+    final isSelected = _selectedTimeSlots.containsKey(label);
+    final selectedTime = _selectedTimeSlots[label];
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
+      onTap: () async {
+        if (isSelected) {
+          setState(() {
             _selectedTimeSlots.remove(label);
+          });
+        } else {
+          // Default time logic
+          TimeOfDay initialTime;
+          if (label == 'Morning') {
+            initialTime = const TimeOfDay(hour: 8, minute: 0); // 8:00 AM
+          } else if (label == 'Noon') {
+            initialTime = const TimeOfDay(hour: 13, minute: 0); // 1:00 PM
           } else {
-            _selectedTimeSlots.add(label);
+            initialTime = const TimeOfDay(hour: 21, minute: 0); // 9:00 PM
           }
-        });
+
+          final TimeOfDay? picked = await showTimePicker(
+            context: context,
+            initialTime: initialTime,
+            builder: (BuildContext context, Widget? child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+                child: child!,
+              );
+            },
+          );
+
+          if (picked != null) {
+            setState(() {
+              _selectedTimeSlots[label] = picked;
+            });
+          }
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: AppTheme.surfaceColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
         ),
         child: Row(
@@ -132,7 +169,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 child: Icon(Icons.check_circle, size: 18, color: Theme.of(context).primaryColor),
               ),
             Text(
-              label,
+              isSelected && selectedTime != null 
+                  ? '$label (${selectedTime.format(context)})' 
+                  : label,
               style: TextStyle(
                 color: isSelected ? Theme.of(context).primaryColor : AppTheme.textPrimary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -156,7 +195,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
           color: AppTheme.surfaceColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
         ),
         child: Text(
@@ -169,6 +208,33 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _retrieveLostData();
+  }
+
+  Future<void> _retrieveLostData() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final LostDataResponse response = await picker.retrieveLostData();
+      if (response.isEmpty) {
+        return;
+      }
+      if (response.file != null) {
+        if (mounted) {
+          setState(() {
+            _image = File(response.file!.path);
+          });
+        }
+      } else {
+        debugPrint('Lost data error: ${response.exception}');
+      }
+    } catch (e) {
+      debugPrint('Error retrieving lost data: $e');
+    }
   }
 
   @override
@@ -202,7 +268,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Name
               Container(
@@ -216,7 +282,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   decoration: InputDecoration(
                     labelText: 'Medicine Name',
                     prefixIcon: Icon(Icons.medication, color: AppTheme.textSecondary),
+                    filled: false,
                     border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                     labelStyle: TextStyle(color: AppTheme.textSecondary),
                   ),
@@ -229,7 +300,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 30),
 
               // Type Dropdown
               Container(
@@ -244,7 +315,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   decoration: InputDecoration(
                     labelText: 'Type of Medicine',
                     prefixIcon: Icon(Icons.category, color: AppTheme.textSecondary),
+                    filled: false,
                     border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
                     labelStyle: TextStyle(color: AppTheme.textSecondary),
                   ),
                   style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
@@ -262,7 +338,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 30),
 
               // Duration & Start Date Row (same height)
               Row(
@@ -323,7 +399,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedDuration,
                         decoration: const InputDecoration(
+                          filled: false,
                           border: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
                         ),
                         style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
                         dropdownColor: AppTheme.surfaceColor,
@@ -354,7 +435,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Frequency Chips
               Text('Frequency', style: Theme.of(context).textTheme.titleMedium),
@@ -369,7 +450,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   _buildFrequencyChip('Night'),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Instruction Chips
               Text('When to Take', style: Theme.of(context).textTheme.titleMedium),
@@ -382,7 +463,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   _buildInstructionChip('Any Time'),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 48),
 
               // Save Button
               GestureDetector(
@@ -393,22 +474,34 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     color: Theme.of(context).primaryColor,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
+                      // Light Shadow (Top Left)
                       BoxShadow(
-                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                        color: Colors.white.withOpacity(0.3),
+                        offset: const Offset(-6, -6),
                         blurRadius: 12,
-                        offset: const Offset(0, 6),
+                      ),
+                      // Dark Shadow (Bottom Right)
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        offset: const Offset(6, 6),
+                        blurRadius: 12,
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Text(
-                      'Save Reminder',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_outline, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Save Reminder',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),

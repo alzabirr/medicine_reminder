@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // 🎨 Neumorphism Colors - Soft & Pleasant (Low brightness)
-  static const Color primaryColor = Color(0xFF6366F1); // Indigo
+  static const Color primaryColor = Color(0xFF1E88E5); // Medical Blue
   static const Color secondaryColor = Color(0xFFEC4899); // Pink
   static const Color accentColor = Color(0xFFF59E0B); // Orange
   static const Color backgroundColor = Color(0xFFF0F0F0); // Dimmer Gray (low brightness, easy on eyes)

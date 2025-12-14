@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
@@ -7,7 +7,7 @@ class NotificationService {
       fln.FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    tz.initializeTimeZones();
+    tz_data.initializeTimeZones();
 
     const fln.AndroidInitializationSettings initializationSettingsAndroid =
         fln.AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -26,6 +26,17 @@ class NotificationService {
     );
 
     await _notificationsPlugin.initialize(initializationSettings);
+  }
+
+  Future<void> requestPermissions() async {
+    final fln.AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        _notificationsPlugin.resolvePlatformSpecificImplementation<
+            fln.AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+      await androidImplementation.requestExactAlarmsPermission();
+    }
   }
 
   Future<void> scheduleNotification({
@@ -59,29 +70,35 @@ class NotificationService {
         // For safely, let's bump it to 5 seconds future so the user gets notified "immediately"
         // or just accept it might fail if we don't change it. 
         // Better: don't schedule past non-repeating alarms, or make them "now".
-        tzScheduledTime = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5)); 
+        final now = tz.TZDateTime.now(tz.local);
+        tzScheduledTime = tz.TZDateTime.from(now.add(const Duration(seconds: 5)), tz.local); 
       }
     }
 
-    await _notificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzScheduledTime,
-      const fln.NotificationDetails(
-        android: fln.AndroidNotificationDetails(
-          'medicine_channel',
-          'Medicine Reminders',
-          channelDescription: 'Notifications for medicine reminders',
-          importance: fln.Importance.max,
-          priority: fln.Priority.high,
-          icon: '@mipmap/ic_launcher',
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledTime,
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
+            'medicine_channel',
+            'Medicine Reminders',
+            channelDescription: 'Notifications for medicine reminders',
+            importance: fln.Importance.max,
+            priority: fln.Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: fln.DarwinNotificationDetails(),
         ),
-        iOS: fln.DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: matchDateTimeComponents,
-    );
+        androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: matchDateTimeComponents,
+      );
+    } catch (e) {
+      print('Error scheduling notification (likely exact alarm permission): $e');
+      // Fallback or just log? For now just log to prevent crash.
+    }
   }
 
   Future<void> cancelNotification(int id) async {

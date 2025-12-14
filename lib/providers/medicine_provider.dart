@@ -17,6 +17,7 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> init() async {
     await _databaseService.init();
     await _notificationService.init();
+    await _notificationService.requestPermissions(); // Request permissions on app launch
     await loadMedicines();
     _isLoading = false;
     notifyListeners();
@@ -30,42 +31,65 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> addMedicine(Medicine medicine) async {
     await _databaseService.addMedicine(medicine);
     
-    // Map slots to hours
-    final Map<String, int> slotHours = {
-      'Morning': 8,
-      'Noon': 13,
-      'Night': 21,
-    };
-
-    for (final slot in medicine.timeSlots) {
-      final hour = slotHours[slot] ?? 8;
-      
-      // Create a unique ID for this slot notification
-      // Combining medicine ID and slot name to ensure uniqueness
-      final notificationId = (medicine.id + slot).hashCode;
-
-      final now = DateTime.now();
-      final scheduledTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        hour,
-        0,
-      );
-      
-      // Always daily for these specific slots
-      const matchDateTimeComponents = fln.DateTimeComponents.time;
-
+    // Schedule notifications for each slot
+    // Format is "Label: Time (e.g. Morning: 8:00 AM)"
+    for (final slotString in medicine.timeSlots) {
       try {
+        // Parse "Label: Time"
+        final parts = slotString.split(': ');
+        if (parts.length < 2) continue; // Skip if format is wrong
+        
+        final label = parts[0];
+        final timeStr = parts[1]; // "8:00 AM"
+        
+        // Parse time string to TimeOfDay
+        // Remove spaces and normalize
+        // Basic parsing assuming "8:00 AM" format from TimeOfDay.format()
+        // Format depends on locale, but standard Material is "h:mm a" or "HH:mm"
+        // Better: Pass proper TimeOfDay/DateTime in Medicine object, but strict refactor is hard.
+        // Let's parse strictly assuming standard US (AM/PM) or 24h
+        
+        int hour = 8;
+        int minute = 0;
+        
+        // Quick regex parse
+        // Matches 8:00 AM or 13:00
+        final timeParts = timeStr.split(RegExp(r'[:\s]')); // split by : or space
+        if (timeParts.isNotEmpty) {
+           int h = int.tryParse(timeParts[0]) ?? 8;
+           int m = int.tryParse(timeParts[1]) ?? 0;
+           final isPm = timeStr.toLowerCase().contains('pm');
+           final isAm = timeStr.toLowerCase().contains('am');
+           
+           if (isPm && h != 12) h += 12;
+           if (isAm && h == 12) h = 0;
+           
+           hour = h;
+           minute = m;
+        }
+
+        final now = DateTime.now();
+        final scheduledTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        );
+        
+        // Unique ID: medicineId hash + slot hash
+        final notificationId = (medicine.id + label).hashCode;
+
         await _notificationService.scheduleNotification(
           id: notificationId,
-          title: 'Time to take your meds! (${slot})',
-          body: 'Take ${medicine.name} ${medicine.instruction ?? ""}',
+          title: 'Medicine Reminder: ${medicine.name}',
+          body: 'Time to take your ${label.toLowerCase()} dose (${medicine.instruction ?? ""})',
           scheduledTime: scheduledTime,
-          matchDateTimeComponents: matchDateTimeComponents,
+          matchDateTimeComponents: fln.DateTimeComponents.time, // Repeat Daily
         );
+        
       } catch (e) {
-        debugPrint('Error scheduling notification for $slot: $e');
+        debugPrint('Error scheduling notification: $e');
       }
     }
 
@@ -73,17 +97,16 @@ class MedicineProvider extends ChangeNotifier {
   }
 
   Future<void> deleteMedicine(String id) async {
-    // We need to fetch the medicine before deleting to know which slots to cancel
-    // Or we can just try to cancel all possible slots blindly if we don't have the object easily.
-    // Ideally, get from DB first.
-    final medicine = _medicines.firstWhere((m) => m.id == id, orElse: () => _medicines.first); // Fallback risky?
-    
-    if (_medicines.any((m) => m.id == id)) {
-        for (final slot in ['Morning', 'Noon', 'Night']) {
-            await _notificationService.cancelNotification((id + slot).hashCode);
-        }
-        // Also cancel legacy ID just in case
-        await _notificationService.cancelNotification(id.hashCode);
+    // Attempt to cancel all potential slots
+    // Since we don't have the slots easily here without fetching, we iterate common ones
+    // Or we could fetch the medicine first.
+    final medicineIndex = _medicines.indexWhere((m) => m.id == id);
+    if (medicineIndex != -1) {
+       final medicine = _medicines[medicineIndex];
+       for (final slotString in medicine.timeSlots) {
+          final label = slotString.split(': ')[0];
+          await _notificationService.cancelNotification((id + label).hashCode);
+       }
     }
 
     await _databaseService.deleteMedicine(id);
@@ -92,24 +115,20 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> toggleTaken(Medicine medicine) async {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // Check if already taken today
+    // ... existing logic ...
     final isTaken = medicine.takenHistory.any(
       (d) => d.year == now.year && d.month == now.month && d.day == now.day,
     );
 
     if (isTaken) {
-      // Remove today from history (Undo)
       medicine.takenHistory.removeWhere(
         (d) => d.year == now.year && d.month == now.month && d.day == now.day,
       );
     } else {
-      // Add today to history
-      medicine.takenHistory.add(now); // Store exact time
+      medicine.takenHistory.add(now);
     }
 
-    await medicine.save(); // HiveObject save
+    await medicine.save();
     notifyListeners();
   }
 }

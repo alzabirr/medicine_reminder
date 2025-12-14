@@ -29,6 +29,7 @@ class MedicineReminderApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
        
+      restorationScopeId: 'medi_app',
       theme: AppTheme.lightTheme,
 
       home: const MainScreen(),
