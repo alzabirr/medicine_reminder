@@ -8,31 +8,31 @@ class Medicine extends HiveObject {
   final String id;
 
   @HiveField(1)
-  final String name;
+  String name;
 
   @HiveField(2)
-  final String dosage; // e.g., "1 Tablet", "5ml"
+  String dosage; // e.g., "1 Tablet", "5ml"
 
   @HiveField(3)
-  final String type; // e.g., "Pill", "Liquid", "Injection"
+  String type; // e.g., "Pill", "Liquid", "Injection"
 
   @HiveField(4)
-  final int interval; // Deprecated
+  int interval; // Deprecated
 
   @HiveField(5)
-  final DateTime startTime; // Deprecated
+  DateTime startTime; // Deprecated
 
   @HiveField(8, defaultValue: [])
-  final List<String> timeSlots; // ["Morning", "Noon", "Night"]
+  List<String> timeSlots; // ["Morning", "Noon", "Night"]
 
   @HiveField(9)
-  final String? instruction; // "Before Meal", "After Meal"
+  String? instruction; // "Before Meal", "After Meal"
 
   @HiveField(10)
-  final DateTime? endDate;
+  DateTime? endDate;
 
   @HiveField(6)
-  final String? imagePath;
+  String? imagePath;
 
   @HiveField(7)
   List<DateTime> takenHistory; // To track when it was taken

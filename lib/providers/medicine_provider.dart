@@ -30,69 +30,7 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> addMedicine(Medicine medicine) async {
     await _databaseService.addMedicine(medicine);
-    
-    // Schedule notifications for each slot
-    // Format is "Label: Time (e.g. Morning: 8:00 AM)"
-    for (final slotString in medicine.timeSlots) {
-      try {
-        // Parse "Label: Time"
-        final parts = slotString.split(': ');
-        if (parts.length < 2) continue; // Skip if format is wrong
-        
-        final label = parts[0];
-        final timeStr = parts[1]; // "8:00 AM"
-        
-        // Parse time string to TimeOfDay
-        // Remove spaces and normalize
-        // Basic parsing assuming "8:00 AM" format from TimeOfDay.format()
-        // Format depends on locale, but standard Material is "h:mm a" or "HH:mm"
-        // Better: Pass proper TimeOfDay/DateTime in Medicine object, but strict refactor is hard.
-        // Let's parse strictly assuming standard US (AM/PM) or 24h
-        
-        int hour = 8;
-        int minute = 0;
-        
-        // Quick regex parse
-        // Matches 8:00 AM or 13:00
-        final timeParts = timeStr.split(RegExp(r'[:\s]')); // split by : or space
-        if (timeParts.isNotEmpty) {
-           int h = int.tryParse(timeParts[0]) ?? 8;
-           int m = int.tryParse(timeParts[1]) ?? 0;
-           final isPm = timeStr.toLowerCase().contains('pm');
-           final isAm = timeStr.toLowerCase().contains('am');
-           
-           if (isPm && h != 12) h += 12;
-           if (isAm && h == 12) h = 0;
-           
-           hour = h;
-           minute = m;
-        }
-
-        final now = DateTime.now();
-        final scheduledTime = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          hour,
-          minute,
-        );
-        
-        // Unique ID: medicineId hash + slot hash
-        final notificationId = (medicine.id + label).hashCode;
-
-        await _notificationService.scheduleNotification(
-          id: notificationId,
-          title: 'Medicine Reminder: ${medicine.name}',
-          body: 'Time to take your ${label.toLowerCase()} dose (${medicine.instruction ?? ""})',
-          scheduledTime: scheduledTime,
-          matchDateTimeComponents: fln.DateTimeComponents.time, // Repeat Daily
-        );
-        
-      } catch (e) {
-        debugPrint('Error scheduling notification: $e');
-      }
-    }
-
+    await _scheduleNotifications(medicine);
     await loadMedicines();
   }
 
@@ -104,13 +42,108 @@ class MedicineProvider extends ChangeNotifier {
     if (medicineIndex != -1) {
        final medicine = _medicines[medicineIndex];
        for (final slotString in medicine.timeSlots) {
-          final label = slotString.split(': ')[0];
+          // Robust label extraction matching addMedicine
+          final pivotIndex = slotString.indexOf(':');
+          final label = pivotIndex != -1 
+              ? slotString.substring(0, pivotIndex).trim() 
+              : slotString; // Fallback if no colon (shouldn't happen with new logic, but safe)
+          
           await _notificationService.cancelNotification((id + label).hashCode);
        }
     }
 
     await _databaseService.deleteMedicine(id);
     await loadMedicines();
+  }
+
+  Future<void> updateMedicine(Medicine medicine, {
+    required String name,
+    required String type,
+    required List<String> timeSlots,
+    required String instruction,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? imagePath,
+  }) async {
+    // 1. Cancel old notifications using OLD slots
+    for (final slotString in medicine.timeSlots) {
+       final pivotIndex = slotString.indexOf(':');
+       final label = pivotIndex != -1 
+          ? slotString.substring(0, pivotIndex).trim() 
+          : slotString;
+       await _notificationService.cancelNotification((medicine.id + label).hashCode);
+    }
+
+    // 2. Update Medicine Object
+    medicine.name = name;
+    medicine.type = type;
+    medicine.timeSlots = timeSlots;
+    medicine.instruction = instruction;
+    medicine.startTime = startDate;
+    medicine.endDate = endDate;
+    if (imagePath != null) medicine.imagePath = imagePath;
+    
+    await medicine.save();
+
+    // 3. Schedule New Notifications
+    await _scheduleNotifications(medicine);
+    
+    notifyListeners();
+  }
+
+  Future<void> _scheduleNotifications(Medicine medicine) async {
+    for (final slotString in medicine.timeSlots) {
+      try {
+        final pivotIndex = slotString.indexOf(':');
+        if (pivotIndex == -1) continue; 
+        
+        final label = slotString.substring(0, pivotIndex).trim();
+        final timeStr = slotString.substring(pivotIndex + 1).trim(); 
+        
+        int hour = 8;
+        int minute = 0;
+        
+        final RegExp timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+        final match = timeRegex.firstMatch(timeStr);
+
+        if (match != null) {
+           int h = int.parse(match.group(1)!);
+           int m = int.parse(match.group(2)!);
+           final period = match.group(3)?.toLowerCase(); 
+
+           if (period == 'pm' && h != 12) h += 12;
+           if (period == 'am' && h == 12) h = 0;
+           
+           hour = h;
+           minute = m;
+        } else {
+             debugPrint('Could not parse time string: $timeStr');
+             continue; 
+        }
+
+        final now = DateTime.now();
+        final scheduledTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        );
+        
+        final notificationId = (medicine.id + label).hashCode;
+
+        await _notificationService.scheduleNotification(
+          id: notificationId,
+          title: 'Medicine Reminder: ${medicine.name}',
+          body: 'Please take your medicine',
+          scheduledTime: scheduledTime,
+          matchDateTimeComponents: fln.DateTimeComponents.time,
+        );
+        
+      } catch (e) {
+        debugPrint('Error scheduling notification: $e');
+      }
+    }
   }
 
   Future<void> toggleTaken(Medicine medicine) async {

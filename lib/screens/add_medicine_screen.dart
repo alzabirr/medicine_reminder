@@ -8,7 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 class AddMedicineScreen extends StatefulWidget {
-  const AddMedicineScreen({super.key});
+  final Medicine? medicine;
+  const AddMedicineScreen({super.key, this.medicine});
 
   @override
   State<AddMedicineScreen> createState() => _AddMedicineScreenState();
@@ -29,6 +30,53 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', '2 Months', '3 Months', '6 Months'];
 
   File? _image;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.medicine != null) {
+      final m = widget.medicine!;
+      _nameController.text = m.name;
+      _selectedType = m.type; // Ensure value exists in _types or handle custom
+      if (!_types.contains(m.type)) {
+         if (_types.isNotEmpty) _selectedType = _types.first; 
+         // ideally adds it or handles it, but robust enough for now
+      }
+      _selectedInstruction = m.instruction ?? 'After Meal';
+      _startDate = m.startTime;
+      if (m.imagePath != null) _image = File(m.imagePath!);
+      
+      // Parse time slots
+      for (final slot in m.timeSlots) {
+         final pivot = slot.indexOf(':');
+         if (pivot != -1) {
+            final label = slot.substring(0, pivot).trim();
+            final timeStr = slot.substring(pivot + 1).trim();
+            
+            // Parse timeStr to TimeOfDay
+            // We can try strict format or our robust logic.
+            // Since TimeOfDay is just hour/minute, let's use the robust logic 
+            // from provider but simpler here for TimeOfDay
+            try {
+               final timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+               final match = timeRegex.firstMatch(timeStr);
+               if (match != null) {
+                  int h = int.parse(match.group(1)!);
+                  int m = int.parse(match.group(2)!);
+                  final period = match.group(3)?.toLowerCase();
+
+                  if (period == 'pm' && h != 12) h += 12;
+                  if (period == 'am' && h == 12) h = 0;
+                  
+                  _selectedTimeSlots[label] = TimeOfDay(hour: h, minute: m);
+               }
+            } catch (e) {
+               debugPrint('Error parsing time for edit: $timeStr');
+            }
+         }
+      }
+    }
+  }
 
   DateTime get _calculatedEndDate {
     switch (_selectedDuration) {
@@ -93,24 +141,42 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         return '${e.key}: $timeString';
       }).toList();
 
-      final medicine = Medicine(
-        id: const Uuid().v4(),
-        name: _nameController.text,
-        dosage: '',
-        type: _selectedType,
-        startTime: _startDate,
-        timeSlots: formattedTimeSlots,
-        instruction: _selectedInstruction,
-        endDate: _calculatedEndDate,
-        imagePath: _image?.path,
-      );
+      if (widget.medicine != null) {
+        // Edit Mode
+         Provider.of<MedicineProvider>(context, listen: false).updateMedicine(
+            widget.medicine!,
+            name: _nameController.text,
+            type: _selectedType,
+            timeSlots: formattedTimeSlots,
+            instruction: _selectedInstruction,
+            startDate: _startDate,
+            endDate: _calculatedEndDate,
+            imagePath: _image?.path,
+         );
+         ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Medicine Updated Successfully! 💊')),
+         );
+      } else {
+        // Add Mode
+        final medicine = Medicine(
+          id: const Uuid().v4(),
+          name: _nameController.text,
+          dosage: '',
+          type: _selectedType,
+          startTime: _startDate,
+          timeSlots: formattedTimeSlots,
+          instruction: _selectedInstruction,
+          endDate: _calculatedEndDate,
+          imagePath: _image?.path,
+        );
 
-      Provider.of<MedicineProvider>(context, listen: false).addMedicine(medicine);
+        Provider.of<MedicineProvider>(context, listen: false).addMedicine(medicine);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Medicine Added Successfully! 💊')),
+        );
+      }
 
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Medicine Added Successfully! 💊')),
-      );
     }
   }
 
@@ -240,7 +306,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Medicine')),
+      appBar: AppBar(title: Text(widget.medicine != null ? 'Edit Medicine' : 'Add Medicine')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Form(

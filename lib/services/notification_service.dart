@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class NotificationService {
   final fln.FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -8,6 +9,18 @@ class NotificationService {
 
   Future<void> init() async {
     tz_data.initializeTimeZones();
+    
+    // Get the device's local time zone string
+    // Get the device's local time zone string
+    // flutter_timezone 5.0+ returns a TimezoneInfo object, older versions return String.
+    // Handling both cases dynamically.
+    final dynamic localTimezone = await FlutterTimezone.getLocalTimezone();
+    final String timeZoneName = localTimezone is String
+        ? localTimezone
+        : localTimezone.identifier;
+
+    // Set the local location
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
 
     const fln.AndroidInitializationSettings initializationSettingsAndroid =
         fln.AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -37,6 +50,18 @@ class NotificationService {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
     }
+
+    final fln.IOSFlutterLocalNotificationsPlugin? iosImplementation =
+        _notificationsPlugin.resolvePlatformSpecificImplementation<
+            fln.IOSFlutterLocalNotificationsPlugin>();
+    
+    if (iosImplementation != null) {
+      await iosImplementation.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
   }
 
   Future<void> scheduleNotification({
@@ -46,16 +71,16 @@ class NotificationService {
     required DateTime scheduledTime,
     fln.DateTimeComponents? matchDateTimeComponents,
   }) async {
-    // If scheduledTime is in the past, adjust it to the future for the first occurrence
-    // This logic relies on 'matchDateTimeComponents' to handle repetitions,
-    // but zonedSchedule with absolute time needs a future time effectively.
-    // However, if matchDateTimeComponents is set, it matches components (e.g. time)
-    // regardless of the exact date, USUALLY. 
-    // But safe practice: if it's already passed for today, schedule for tomorrow?
-    // Actually, zonedSchedule with matchDateTimeComponents uses the time component.
-    
-    // Convert to TZDateTime
-    tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+    // Force the time into the local timezone location
+    // This ensures that "8:00 AM" means "8:00 AM in the phone's current timezone"
+    tz.TZDateTime tzScheduledTime = tz.TZDateTime(
+      tz.local,
+      scheduledTime.year,
+      scheduledTime.month,
+      scheduledTime.day,
+      scheduledTime.hour,
+      scheduledTime.minute,
+    );
      
     // If time is in the past, adjust it based on repeat interval
     if (tzScheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
@@ -66,12 +91,13 @@ class NotificationService {
         // Weekly: Schedule for next week
         tzScheduledTime = tzScheduledTime.add(const Duration(days: 7));
       } else {
-        // If not repeating and in past, schedule for 1 minute from now (or just log/skip)
-        // For safely, let's bump it to 5 seconds future so the user gets notified "immediately"
-        // or just accept it might fail if we don't change it. 
-        // Better: don't schedule past non-repeating alarms, or make them "now".
+        // One-time: schedule for near future (5s) if strictly in past?
+        // Actually, if a user sets a one-time reminder for the past, it should probably happen "now" or warn.
+        // But for this app, we mostly use daily.
         final now = tz.TZDateTime.now(tz.local);
-        tzScheduledTime = tz.TZDateTime.from(now.add(const Duration(seconds: 5)), tz.local); 
+        if (tzScheduledTime.isBefore(now)) {
+           tzScheduledTime = now.add(const Duration(seconds: 5));
+        }
       }
     }
 
@@ -83,12 +109,14 @@ class NotificationService {
         tzScheduledTime,
         const fln.NotificationDetails(
           android: fln.AndroidNotificationDetails(
-            'medicine_channel',
+            'medicine_channel_updates', 
             'Medicine Reminders',
             channelDescription: 'Notifications for medicine reminders',
             importance: fln.Importance.max,
             priority: fln.Priority.high,
             icon: '@mipmap/ic_launcher',
+            playSound: true,
+            enableVibration: true,
           ),
           iOS: fln.DarwinNotificationDetails(),
         ),
@@ -96,8 +124,7 @@ class NotificationService {
         matchDateTimeComponents: matchDateTimeComponents,
       );
     } catch (e) {
-      print('Error scheduling notification (likely exact alarm permission): $e');
-      // Fallback or just log? For now just log to prevent crash.
+      print('Error scheduling notification: $e');
     }
   }
 

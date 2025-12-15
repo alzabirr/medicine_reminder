@@ -4,6 +4,7 @@ import 'package:medi/models/medicine.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
+import 'package:medi/screens/add_medicine_screen.dart';
 
 class MedicineDetailsScreen extends StatelessWidget {
   final Medicine medicine;
@@ -16,6 +17,20 @@ class MedicineDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Medicine Details'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddMedicineScreen(medicine: medicine),
+                ),
+              ).then((_) {
+                 // Pop details screen to refresh/show list
+                 Navigator.pop(context);
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () {
