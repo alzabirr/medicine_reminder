@@ -1,66 +1,54 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter/material.dart';
 
 class NotificationService {
-  final fln.FlutterLocalNotificationsPlugin _notificationsPlugin =
-      fln.FlutterLocalNotificationsPlugin();
+  
+  // Singleton pattern not strictly necessary if used via Provider, but good practice
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
 
   Future<void> init() async {
-    tz_data.initializeTimeZones();
+    // Initialization is done in main.dart for Awesome Notifications usually, 
+    // but we can put listeners here.
     
-    // Get the device's local time zone string
-    // Get the device's local time zone string
-    // flutter_timezone 5.0+ returns a TimezoneInfo object, older versions return String.
-    // Handling both cases dynamically.
-    final dynamic localTimezone = await FlutterTimezone.getLocalTimezone();
-    final String timeZoneName = localTimezone is String
-        ? localTimezone
-        : localTimezone.identifier;
-
-    // Set the local location
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-
-    const fln.AndroidInitializationSettings initializationSettingsAndroid =
-        fln.AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // iOS settings (minimal for now)
-    const fln.DarwinInitializationSettings initializationSettingsDarwin =
-        fln.DarwinInitializationSettings(
-      requestSoundPermission: true,
-      requestBadgePermission: true,
-      requestAlertPermission: true,
+    await AwesomeNotifications().setListeners(
+        onActionReceivedMethod:         onActionReceivedMethod,
+        onNotificationCreatedMethod:    onNotificationCreatedMethod,
+        onNotificationDisplayedMethod:  onNotificationDisplayedMethod,
+        onDismissActionReceivedMethod:  onDismissActionReceivedMethod
     );
+  }
 
-    const fln.InitializationSettings initializationSettings = fln.InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsDarwin,
-    );
+  /// Use this method to detect when a new notification or a schedule is created
+  @pragma("vm:entry-point")
+  static Future <void> onNotificationCreatedMethod(ReceivedNotification receivedNotification) async {
+    debugPrint("Notification created: ${receivedNotification.id}");
+  }
 
-    await _notificationsPlugin.initialize(initializationSettings);
+  /// Use this method to detect every time that a new notification is displayed
+  @pragma("vm:entry-point")
+  static Future <void> onNotificationDisplayedMethod(ReceivedNotification receivedNotification) async {
+     debugPrint("Notification displayed: ${receivedNotification.id}");
+  }
+
+  /// Use this method to detect if the user dismissed a notification
+  @pragma("vm:entry-point")
+  static Future <void> onDismissActionReceivedMethod(ReceivedAction receivedAction) async {
+    // Dismiss logic
+  }
+
+  /// Use this method to detect when the user taps on a notification or action button
+  @pragma("vm:entry-point")
+  static Future <void> onActionReceivedMethod(ReceivedAction receivedAction) async {
+    // Navigate to details page if needed
+    debugPrint("Action received: ${receivedAction.id}");
   }
 
   Future<void> requestPermissions() async {
-    final fln.AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        _notificationsPlugin.resolvePlatformSpecificImplementation<
-            fln.AndroidFlutterLocalNotificationsPlugin>();
-
-    if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
-    }
-
-    final fln.IOSFlutterLocalNotificationsPlugin? iosImplementation =
-        _notificationsPlugin.resolvePlatformSpecificImplementation<
-            fln.IOSFlutterLocalNotificationsPlugin>();
-    
-    if (iosImplementation != null) {
-      await iosImplementation.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+    bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (!isAllowed) {
+      await AwesomeNotifications().requestPermissionToSendNotifications();
     }
   }
 
@@ -68,72 +56,41 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
-    required DateTime scheduledTime,
-    fln.DateTimeComponents? matchDateTimeComponents,
+    required int hour,
+    required int minute,
   }) async {
-    // Force the time into the local timezone location
-    // This ensures that "8:00 AM" means "8:00 AM in the phone's current timezone"
-    tz.TZDateTime tzScheduledTime = tz.TZDateTime(
-      tz.local,
-      scheduledTime.year,
-      scheduledTime.month,
-      scheduledTime.day,
-      scheduledTime.hour,
-      scheduledTime.minute,
+    
+    // Convert to local time zone logic handled by Awesome Notifications 'NotificationCalendar'
+    // It uses the device's local time automatically.
+    
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: id,
+        channelKey: 'basic_channel', // Must match main.dart
+        title: title,
+        body: body,
+        notificationLayout: NotificationLayout.Default, // or BigText
+        category: NotificationCategory.Alarm, // To ensure it rings loud
+        wakeUpScreen: true,
+        fullScreenIntent: true,
+        autoDismissible: false,
+        backgroundColor: Colors.deepPurple,
+      ),
+      schedule: NotificationCalendar(
+        hour: hour,
+        minute: minute,
+        second: 0,
+        millisecond: 0,
+        repeats: true, // Daily
+        allowWhileIdle: true,
+        preciseAlarm: true,
+      ),
     );
-     
-    // If time is in the past, adjust it based on repeat interval
-    if (tzScheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
-      if (matchDateTimeComponents == fln.DateTimeComponents.time) {
-        // Daily: Schedule for tomorrow
-        tzScheduledTime = tzScheduledTime.add(const Duration(days: 1));
-      } else if (matchDateTimeComponents == fln.DateTimeComponents.dayOfWeekAndTime) {
-        // Weekly: Schedule for next week
-        tzScheduledTime = tzScheduledTime.add(const Duration(days: 7));
-      } else {
-        // One-time: schedule for near future (5s) if strictly in past?
-        // Actually, if a user sets a one-time reminder for the past, it should probably happen "now" or warn.
-        // But for this app, we mostly use daily.
-        final now = tz.TZDateTime.now(tz.local);
-        if (tzScheduledTime.isBefore(now)) {
-           tzScheduledTime = now.add(const Duration(seconds: 5));
-        }
-      }
-    }
-
-    try {
-      await _notificationsPlugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tzScheduledTime,
-        const fln.NotificationDetails(
-          android: fln.AndroidNotificationDetails(
-            'medicine_channel_v2', // Changed channel ID to force update
-            'Medicine Reminders',
-            channelDescription: 'Notifications for medicine reminders',
-            importance: fln.Importance.max,
-            priority: fln.Priority.high,
-            icon: '@mipmap/ic_launcher',
-            playSound: true, // Explicitly enable sound
-            sound: fln.RawResourceAndroidNotificationSound('notification'), // Optional: if you have a custom sound
-          ),
-          iOS: fln.DarwinNotificationDetails(
-            presentSound: true,
-            presentAlert: true,
-            presentBadge: true,
-          ),
-        ),
-        androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: matchDateTimeComponents,
-      );
-    } catch (e) {
-      print('Error scheduling notification: $e');
-    }
+    
+    debugPrint("Scheduled notification $id for $hour:$minute");
   }
 
   Future<void> cancelNotification(int id) async {
-    await _notificationsPlugin.cancel(id);
+    await AwesomeNotifications().cancel(id);
   }
 }
-

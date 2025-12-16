@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
+import 'package:medi/services/notification_service.dart';
 
 class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
@@ -135,9 +135,9 @@ class MedicineProvider extends ChangeNotifier {
         await _notificationService.scheduleNotification(
           id: notificationId,
           title: 'Medicine Reminder: ${medicine.name}',
-          body: 'Please take your medicine',
-          scheduledTime: scheduledTime,
-          matchDateTimeComponents: fln.DateTimeComponents.time,
+          body: 'Please take your ${medicine.name} (${medicine.dosage})',
+          hour: hour,
+          minute: minute,
         );
         
       } catch (e) {
