@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as dart_ui; // Added for ImageFilter
 import 'package:medi/models/medicine.dart'; // Added
@@ -6,7 +8,7 @@ import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/screens/add_medicine_screen.dart';
 import 'package:medi/screens/medicine_details_screen.dart'; // Added
 import 'package:medi/widgets/medicine_card.dart';
-import 'package:medi/widgets/medicine_card.dart';
+import 'package:medi/widgets/neumorphic_container.dart';
 import 'package:medi/core/transitions.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +25,118 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   CalendarFormat _calendarFormat = CalendarFormat.week; // Default to week view
+  
+  @override
+  void initState() {
+    super.initState();
+    // Request permissions after UI is built
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notificationService = Provider.of<MedicineProvider>(context, listen: false).notificationService;
+      final missingPermissions = await notificationService.requestPermissions();
+      
+      if (missingPermissions.contains(NotificationPermission.PreciseAlarms) && mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white,
+            elevation: 5,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   // Icon
+                   Container(
+                     padding: const EdgeInsets.all(16),
+                     decoration: BoxDecoration(
+                       color: Theme.of(context).primaryColor.withOpacity(0.1),
+                       shape: BoxShape.circle,
+                     ),
+                     child: Icon(
+                       Icons.notifications_active_rounded, 
+                       size: 40, 
+                       color: Theme.of(context).primaryColor
+                     ),
+                   ),
+                   const SizedBox(height: 20),
+                   
+                   // Title
+                   Text(
+                    "Permission Required",
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.headlineSmall?.color,
+                    ),
+                    textAlign: TextAlign.center,
+                   ),
+                   const SizedBox(height: 12),
+                   
+                   // Content
+                   Text(
+                    "Turn on reminders to take your medicine on time.",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).textTheme.titleMedium?.color,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                   ),
+                   const SizedBox(height: 24),
+                   
+                   // Buttons
+                   Row(
+                     children: [
+                       Expanded(
+                         child: OutlinedButton(
+                           onPressed: () => Navigator.pop(context),
+                           style: OutlinedButton.styleFrom(
+                             padding: const EdgeInsets.symmetric(vertical: 16),
+                             side: BorderSide(color: Colors.grey.shade300),
+                             shape: RoundedRectangleBorder(
+                               borderRadius: BorderRadius.circular(12),
+                             ),
+                           ),
+                           child: Text(
+                             "Cancel",
+                             style: TextStyle(color: Colors.grey[700]), 
+                           ),
+                         ),
+                       ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                         child: GestureDetector(
+                           onTap: () async {
+                              Navigator.pop(context);
+                              await Permission.scheduleExactAlarm.request();
+                           },
+                           child: NeumorphicContainer(
+                             padding: const EdgeInsets.symmetric(vertical: 16),
+                             borderRadius: 12,
+                             color: Theme.of(context).primaryColor, // Colored button
+                             child: const Center(
+                               child: Text(
+                                 "Allow",
+                                 style: TextStyle(
+                                   color: Colors.white, 
+                                   fontWeight: FontWeight.bold,
+                                   fontSize: 16,
+                                 ),
+                               ),
+                             ),
+                           ),
+                         ),
+                       ),
+                     ],
+                   )
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    });
+  }
 
   List<Medicine> _getMedicinesForDay(DateTime day, List<Medicine> allMedicines) {
     return allMedicines.where((medicine) {

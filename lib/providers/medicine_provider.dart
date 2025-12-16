@@ -7,6 +7,7 @@ import 'package:medi/services/notification_service.dart';
 class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final NotificationService _notificationService = NotificationService();
+  NotificationService get notificationService => _notificationService;
 
   List<Medicine> _medicines = [];
   List<Medicine> get medicines => _medicines;
@@ -17,7 +18,7 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> init() async {
     await _databaseService.init();
     await _notificationService.init();
-    await _notificationService.requestPermissions(); // Request permissions on app launch
+    // Permissions should be requested from UI, not here blocking startup
     await loadMedicines();
     _isLoading = false;
     notifyListeners();

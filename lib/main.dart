@@ -19,7 +19,7 @@ void main() async {
         channelDescription: 'Notification channel for medicine reminders',
         defaultColor: const Color(0xFF9D50DD),
         ledColor: Colors.white,
-        importance: NotificationImportance.High,
+        importance: NotificationImportance.Max,
         channelShowBadge: true,
         locked: true,
         defaultRingtoneType: DefaultRingtoneType.Alarm,

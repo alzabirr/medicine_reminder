@@ -1,5 +1,6 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService {
   
@@ -45,12 +46,13 @@ class NotificationService {
     debugPrint("Action received: ${receivedAction.id}");
   }
 
-  Future<void> requestPermissions() async {
-    // Check if notifications are allowed
+  Future<List<NotificationPermission>> requestPermissions() async {
+    List<NotificationPermission> missingPermissions = [];
+
+    // 1. Basic Notifications
     bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
     if (!isAllowed) {
-      // Request full set of permissions including Precise Alarms
-      await AwesomeNotifications().requestPermissionToSendNotifications(
+      bool userGranted = await AwesomeNotifications().requestPermissionToSendNotifications(
         channelKey: 'basic_channel',
         permissions: [
           NotificationPermission.Alert,
@@ -58,30 +60,22 @@ class NotificationService {
           NotificationPermission.Badge,
           NotificationPermission.Vibration,
           NotificationPermission.Light,
-          NotificationPermission.PreciseAlarms, // Critical for timely delivery
           NotificationPermission.FullScreenIntent,
         ],
       );
-    } else {
-        // Even if basic notifications are allowed, check for Precise Alarms specifically
-        List<NotificationPermission> permissionsAllowed = await AwesomeNotifications().checkPermissionList(
-            channelKey: 'basic_channel',
-            permissions: [
-                NotificationPermission.PreciseAlarms,
-                NotificationPermission.FullScreenIntent,
-            ]
-        );
-        
-        if (!permissionsAllowed.contains(NotificationPermission.PreciseAlarms)) {
-             await AwesomeNotifications().requestPermissionToSendNotifications(
-                channelKey: 'basic_channel',
-                permissions: [
-                     NotificationPermission.PreciseAlarms,
-                     NotificationPermission.FullScreenIntent,
-                ]
-            );
-        }
+      if (!userGranted) {
+        // user denied basic notifications
+        return []; 
+      }
     }
+
+    // 2. Precise Alarms (Android 12+)
+    // Using permission_handler for reliable check
+    if (await Permission.scheduleExactAlarm.isDenied) {
+        missingPermissions.add(NotificationPermission.PreciseAlarms);
+    }
+    
+    return missingPermissions;
   }
 
   Future<void> scheduleNotification({
