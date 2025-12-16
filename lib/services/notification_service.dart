@@ -46,9 +46,41 @@ class NotificationService {
   }
 
   Future<void> requestPermissions() async {
+    // Check if notifications are allowed
     bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
     if (!isAllowed) {
-      await AwesomeNotifications().requestPermissionToSendNotifications();
+      // Request full set of permissions including Precise Alarms
+      await AwesomeNotifications().requestPermissionToSendNotifications(
+        channelKey: 'basic_channel',
+        permissions: [
+          NotificationPermission.Alert,
+          NotificationPermission.Sound,
+          NotificationPermission.Badge,
+          NotificationPermission.Vibration,
+          NotificationPermission.Light,
+          NotificationPermission.PreciseAlarms, // Critical for timely delivery
+          NotificationPermission.FullScreenIntent,
+        ],
+      );
+    } else {
+        // Even if basic notifications are allowed, check for Precise Alarms specifically
+        List<NotificationPermission> permissionsAllowed = await AwesomeNotifications().checkPermissionList(
+            channelKey: 'basic_channel',
+            permissions: [
+                NotificationPermission.PreciseAlarms,
+                NotificationPermission.FullScreenIntent,
+            ]
+        );
+        
+        if (!permissionsAllowed.contains(NotificationPermission.PreciseAlarms)) {
+             await AwesomeNotifications().requestPermissionToSendNotifications(
+                channelKey: 'basic_channel',
+                permissions: [
+                     NotificationPermission.PreciseAlarms,
+                     NotificationPermission.FullScreenIntent,
+                ]
+            );
+        }
     }
   }
 
