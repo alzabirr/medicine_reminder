@@ -109,16 +109,20 @@ class NotificationService {
         tzScheduledTime,
         const fln.NotificationDetails(
           android: fln.AndroidNotificationDetails(
-            'medicine_channel_updates', 
+            'medicine_channel_v2', // Changed channel ID to force update
             'Medicine Reminders',
             channelDescription: 'Notifications for medicine reminders',
             importance: fln.Importance.max,
             priority: fln.Priority.high,
             icon: '@mipmap/ic_launcher',
-            playSound: true,
-            enableVibration: true,
+            playSound: true, // Explicitly enable sound
+            sound: fln.RawResourceAndroidNotificationSound('notification'), // Optional: if you have a custom sound
           ),
-          iOS: fln.DarwinNotificationDetails(),
+          iOS: fln.DarwinNotificationDetails(
+            presentSound: true,
+            presentAlert: true,
+            presentBadge: true,
+          ),
         ),
         androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: matchDateTimeComponents,

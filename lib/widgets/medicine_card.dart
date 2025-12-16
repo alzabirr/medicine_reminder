@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/core/theme.dart';
+import 'package:medi/utils/medicine_utils.dart';
 
 class MedicineCard extends StatelessWidget {
   final Medicine medicine;
@@ -92,6 +93,40 @@ class MedicineCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      
+                      // Next Dose Indicator
+                      if (!isTakenToday) ...[
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final remaining = MedicineUtils.getTimeUntilNextDose(medicine);
+                            if (remaining == null) return const SizedBox.shrink();
+                            
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.access_time_filled, size: 14, color: Theme.of(context).primaryColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Next in ${MedicineUtils.formatDuration(remaining)}',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        ),
+                      ],
                     ],
                   ),
                 ),
