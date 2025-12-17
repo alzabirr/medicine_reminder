@@ -84,10 +84,12 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
+    DateTime? startDate, // Optional: when to start the recurring notification
   }) async {
     
-    // Convert to local time zone logic handled by Awesome Notifications 'NotificationCalendar'
-    // It uses the device's local time automatically.
+    // If startDate is provided, schedule from that date
+    // Otherwise, schedule from today (default behavior)
+    final scheduleDate = startDate ?? DateTime.now();
     
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
@@ -103,17 +105,24 @@ class NotificationService {
         backgroundColor: Colors.deepPurple,
       ),
       schedule: NotificationCalendar(
+        year: scheduleDate.year,
+        month: scheduleDate.month,
+        day: scheduleDate.day,
         hour: hour,
         minute: minute,
         second: 0,
         millisecond: 0,
-        repeats: true, // Daily
+        repeats: true, // Daily from the start date
         allowWhileIdle: true,
         preciseAlarm: true,
       ),
     );
     
-    debugPrint("Scheduled notification $id for $hour:$minute");
+    if (startDate != null) {
+      debugPrint("Scheduled notification $id starting from ${scheduleDate.year}-${scheduleDate.month}-${scheduleDate.day} at $hour:$minute");
+    } else {
+      debugPrint("Scheduled notification $id for $hour:$minute");
+    }
   }
 
   Future<void> cancelNotification(int id) async {

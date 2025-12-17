@@ -31,12 +31,48 @@ class MedicineUtils {
     return null;
   }
 
-  /// Returns the Duration until the next scheduled dose for today.
-  /// If all doses for today are passed, it might return the time until tomorrow's first dose.
+  /// Returns the Duration until the next scheduled dose.
+  /// For future medicines (start date in the future), returns time until start date.
+  /// For current medicines, returns time until the next dose today/tomorrow.
+  /// Returns null if all doses have passed and medicine has ended.
   static Duration? getTimeUntilNextDose(Medicine medicine) {
     if (medicine.timeSlots.isEmpty) return null;
 
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+    
+    // If medicine hasn't started yet, show countdown to start date + first time slot
+    if (today.isBefore(start)) {
+      // Find the earliest time slot
+      TimeOfDay? earliestTime;
+      for (final slot in medicine.timeSlots) {
+        final time = parseTime(slot);
+        if (time == null) continue;
+        
+        if (earliestTime == null || 
+            (time.hour < earliestTime.hour || 
+             (time.hour == earliestTime.hour && time.minute < earliestTime.minute))) {
+          earliestTime = time;
+        }
+      }
+      
+      if (earliestTime != null) {
+        final startDateTime = DateTime(
+          start.year,
+          start.month,
+          start.day,
+          earliestTime.hour,
+          earliestTime.minute,
+        );
+        return startDateTime.difference(now);
+      }
+      
+      // If no valid time found, just return time to start date
+      return start.difference(now);
+    }
+    
+    // For current medicines, find next dose
     DateTime? nextDoseDate;
 
     // Check today's slots
@@ -53,8 +89,20 @@ class MedicineUtils {
       }
     }
 
-    // If no more slots today, check tomorrow's first slot
+    // If no more slots today, check if we can look at tomorrow
     if (nextDoseDate == null) {
+      // Check if medicine has an end date and if tomorrow would be beyond it
+      final tomorrow = today.add(const Duration(days: 1));
+      
+      if (medicine.endDate != null) {
+        final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+        if (tomorrow.isAfter(end)) {
+          // Medicine ends today, no more doses
+          return null;
+        }
+      }
+      
+      // Check tomorrow's slots
       for (final slot in medicine.timeSlots) {
         final time = parseTime(slot);
         if (time == null) continue;

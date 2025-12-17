@@ -93,6 +93,41 @@ class MedicineProvider extends ChangeNotifier {
   }
 
   Future<void> _scheduleNotifications(Medicine medicine) async {
+    // Validate if medicine should be active
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+    
+    // 1. Check if medicine has already ended (BLOCK these)
+    if (medicine.endDate != null) {
+      final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+      if (today.isAfter(end)) {
+        debugPrint('Medicine ${medicine.name} has already ended. No notifications scheduled.');
+        return;
+      }
+    }
+    
+    // 2. For future medicines, schedule from start date
+    // For current/past start dates, schedule from today
+    DateTime scheduleFromDate;
+    if (today.isBefore(start)) {
+      // Future medicine - schedule from start date
+      scheduleFromDate = start;
+      debugPrint('Medicine ${medicine.name} starts in the future. Scheduling from ${start.year}-${start.month}-${start.day}');
+    } else {
+      // Current or past start date - schedule from today
+      scheduleFromDate = today;
+    }
+    
+    // 3. Check interval logic (weekly) - only for current medicines
+    if (medicine.interval == 7 && !today.isBefore(start)) {
+      if (medicine.startTime.weekday != now.weekday) {
+        debugPrint('Medicine ${medicine.name} is weekly and today is not the scheduled day. No notifications scheduled.');
+        return;
+      }
+    }
+    
+    // Medicine is valid, proceed with scheduling
     for (final slotString in medicine.timeSlots) {
       try {
         final pivotIndex = slotString.indexOf(':');
@@ -121,15 +156,6 @@ class MedicineProvider extends ChangeNotifier {
              debugPrint('Could not parse time string: $timeStr');
              continue; 
         }
-
-        final now = DateTime.now();
-        final scheduledTime = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          hour,
-          minute,
-        );
         
         final notificationId = (medicine.id + label).hashCode;
 
@@ -139,7 +165,10 @@ class MedicineProvider extends ChangeNotifier {
           body: 'Please take your ${medicine.name} (${medicine.dosage})',
           hour: hour,
           minute: minute,
+          startDate: scheduleFromDate, // Pass the calculated start date
         );
+        
+        debugPrint('Scheduled notification for ${medicine.name} at $hour:$minute from ${scheduleFromDate.year}-${scheduleFromDate.month}-${scheduleFromDate.day}');
         
       } catch (e) {
         debugPrint('Error scheduling notification: $e');

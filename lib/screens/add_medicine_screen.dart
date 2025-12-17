@@ -20,14 +20,16 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final _nameController = TextEditingController();
 
   String _selectedType = 'Tablet';
-  final List<String> _types = ['Pill', 'Tablet','Liquid', 'Injection', 'Drop'];
+  final List<String> _types = ['Tablet','Pill', 'Liquid', 'Injection', 'Drop'];
 
   final Map<String, TimeOfDay> _selectedTimeSlots = {}; // {'Morning': TimeOfDay...}
   String _selectedInstruction = 'After Meal'; // 'Before Meal', 'After Meal', 'Any Time'
 
   DateTime _startDate = DateTime.now();
   String _selectedDuration = '1 Month';
-  final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', '2 Months', '3 Months', '6 Months'];
+  // Removed intermediate options as requested, but kept 2 Weeks
+  final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', 'Pick Date'];
+  DateTime? _customEndDate; // Store custom end date
 
   File? _image;
 
@@ -45,6 +47,29 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       _selectedInstruction = m.instruction ?? 'After Meal';
       _startDate = m.startTime;
       if (m.imagePath != null) _image = File(m.imagePath!);
+      
+      // Check if custom duration
+      if (m.endDate != null) {
+         // Try to match standard durations
+         bool foundStandard = false;
+         for (final d in _durations) {
+            String tempSelected = _selectedDuration; // preserve
+            _selectedDuration = d;
+            if (d != 'Pick Date' && _calculatedEndDate.year == m.endDate!.year && 
+                _calculatedEndDate.month == m.endDate!.month && 
+                _calculatedEndDate.day == m.endDate!.day) {
+                  _selectedDuration = d;
+                  foundStandard = true;
+                  break;
+            }
+            _selectedDuration = tempSelected; // restore
+         }
+         
+         if (!foundStandard) {
+           _selectedDuration = 'Pick Date';
+           _customEndDate = m.endDate;
+         }
+      }
       
       // Parse time slots
       for (final slot in m.timeSlots) {
@@ -79,6 +104,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   DateTime get _calculatedEndDate {
+    if (_selectedDuration == 'Pick Date') {
+      return _customEndDate ?? _startDate;
+    }
     switch (_selectedDuration) {
       case '1 Week':
         return _startDate.add(const Duration(days: 7));
@@ -86,14 +114,31 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         return _startDate.add(const Duration(days: 14));
       case '1 Month':
         return DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
-      case '2 Months':
-        return DateTime(_startDate.year, _startDate.month + 2, _startDate.day);
-      case '3 Months':
-        return DateTime(_startDate.year, _startDate.month + 3, _startDate.day);
-      case '6 Months':
-        return DateTime(_startDate.year, _startDate.month + 6, _startDate.day);
       default:
-        return _startDate.add(const Duration(days: 30));
+        // Default to 1 month if something goes wrong
+        return DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+    }
+  }
+
+
+  Future<void> _selectCustomEndDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate.add(const Duration(days: 1)),
+      firstDate: _startDate,
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        _customEndDate = picked;
+      });
+    } else {
+       // Revert if cancelled and invalid
+       if (_customEndDate == null) {
+          setState(() {
+             _selectedDuration = '1 Month';
+          });
+       }
     }
   }
 
@@ -474,6 +519,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                         ),
                         style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
                         dropdownColor: AppTheme.surfaceColor,
+                        // Show the selected date text if 'Pick Date' is chosen
+                        selectedItemBuilder: (BuildContext context) {
+                          return _durations.map<Widget>((String item) {
+                            if (item == 'Pick Date' && _customEndDate != null) {
+                               final days = _customEndDate!.difference(_startDate).inDays;
+                               final dayText = (days == 0 || days == 1) ? 'Day' : 'Days';
+                               return Text(
+                                 "$days $dayText",
+                                 style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+                               );
+                            }
+                            return Text(item, style: TextStyle(color: AppTheme.textPrimary, fontSize: 16));
+                          }).toList();
+                        },
                         items: _durations.map((String duration) {
                           return DropdownMenuItem<String>(
                             value: duration,
@@ -481,9 +540,17 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           );
                         }).toList(),
                         onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedDuration = newValue!;
-                          });
+                          if (newValue == 'Pick Date') {
+                             setState(() {
+                               _selectedDuration = 'Pick Date';
+                             });
+                             _selectCustomEndDate(context);
+                          } else {
+                            setState(() {
+                              _selectedDuration = newValue!;
+                              _customEndDate = null; // Reset custom if standard selected
+                            });
+                          }
                         },
                       ),
                     ),
