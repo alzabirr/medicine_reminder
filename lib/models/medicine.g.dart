@@ -24,17 +24,18 @@ class MedicineAdapter extends TypeAdapter<Medicine> {
       interval: fields[4] as int,
       startTime: fields[5] as DateTime,
       imagePath: fields[6] as String?,
-      takenHistory: (fields[7] as List).cast<DateTime>(),
+      takenHistory: (fields[7] as List?)?.cast<DateTime>(),
       timeSlots: fields[8] == null ? [] : (fields[8] as List).cast<String>(),
       instruction: fields[9] as String?,
       endDate: fields[10] as DateTime?,
+      isDeleted: fields[11] == null ? false : fields[11] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Medicine obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -55,6 +56,8 @@ class MedicineAdapter extends TypeAdapter<Medicine> {
       ..write(obj.endDate)
       ..writeByte(6)
       ..write(obj.imagePath)
+      ..writeByte(11)
+      ..write(obj.isDeleted)
       ..writeByte(7)
       ..write(obj.takenHistory);
   }

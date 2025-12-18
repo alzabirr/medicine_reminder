@@ -123,12 +123,19 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
+          borderSide: BorderSide.none, // Removed primary blue border
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         labelStyle: TextStyle(color: textSecondary),
         hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
         prefixIconColor: textSecondary,
+      ),
+
+      // Text Selection Theme (Remove Blue)
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: textPrimary,
+        selectionColor: darkShadow.withOpacity(0.4),
+        selectionHandleColor: textPrimary,
       ),
 
       // Elevated Button Theme

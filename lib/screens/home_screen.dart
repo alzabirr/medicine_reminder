@@ -176,138 +176,112 @@ class _HomeScreenState extends State<HomeScreen> {
             }
 
             // Display medicines for selected day
-            final dailyMedicines = _getMedicinesForDay(_selectedDay, provider.medicines);
+            final dailyMedicines = _getMedicinesForDay(_selectedDay, provider.activeMedicines);
 
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Calendar Widget
+                // Premium Header
                 Container(
-                  padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top, 8, 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).canvasColor, // Default surface
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-                  ),
-                  child: Column(
+                  padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 8, 24, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Calendar
-                      TableCalendar(
-                        firstDay: DateTime.utc(2020, 10, 16),
-                        lastDay: DateTime.utc(2030, 3, 14),
-                        focusedDay: _focusedDay,
-                        calendarFormat: _calendarFormat,
-                        availableCalendarFormats: const {
-                          CalendarFormat.week: 'Week',
-                          CalendarFormat.month: 'Month',
-                        },
-                        onFormatChanged: (format) {
-                          setState(() {
-                            _calendarFormat = format;
-                          });
-                        },
-                        onPageChanged: (focusedDay) {
-                          _focusedDay = focusedDay;
-                        },
-                        selectedDayPredicate: (day) {
-                          return isSameDay(_selectedDay, day);
-                        },
-                        onDaySelected: (selectedDay, focusedDay) {
-                          setState(() {
-                            _selectedDay = selectedDay;
-                            _focusedDay = focusedDay;
-                          });
-                        },
-                        calendarStyle: CalendarStyle(
-                          // Today
-                          todayDecoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          todayTextStyle: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           
-                          // Selected
-                          selectedDecoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).primaryColor.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                        
+                          Text(
+                            DateFormat('EEEE, MMMM d').format(_selectedDay),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary.withOpacity(0.6),
+                            ),
                           ),
-                          selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          
-                          // Markers
-                          markerDecoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                            shape: BoxShape.circle,
-                          ),
-                          markersMaxCount: 1,
-                        ),
-                        eventLoader: (day) {
-                          return _getMedicinesForDay(day, provider.medicines);
-                        },
-                        headerStyle: HeaderStyle(
-                          formatButtonVisible: false,
-                          titleCentered: true,
-                          titleTextStyle: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).textTheme.bodyLarge?.color,
-                          ),
-                          leftChevronIcon: Icon(Icons.chevron_left, color: Theme.of(context).primaryColor),
-                          rightChevronIcon: Icon(Icons.chevron_right, color: Theme.of(context).primaryColor),
-                        ),
+                        ],
                       ),
-                      // Week/Month Toggle Button (Bottom Center)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12, bottom: 8),
-                        child: GestureDetector(
-                          onTap: () {
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceColor,
+                          shape: BoxShape.circle,
+                          boxShadow: AppTheme.neumorphicShadow,
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 22),
+                          onPressed: () {
                             setState(() {
                               _calendarFormat = _calendarFormat == CalendarFormat.week
                                   ? CalendarFormat.month
                                   : CalendarFormat.week;
                             });
                           },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: AppTheme.neumorphicShadow,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _calendarFormat == CalendarFormat.week
-                                      ? Icons.calendar_view_month
-                                      : Icons.calendar_view_week,
-                                  size: 20,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _calendarFormat == CalendarFormat.week ? 'Show Month' : 'Show Week',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+
+                // Compact Calendar Widget
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: TableCalendar(
+                    firstDay: DateTime.utc(2020, 10, 16),
+                    lastDay: DateTime.utc(2030, 3, 14),
+                    focusedDay: _focusedDay,
+                    calendarFormat: _calendarFormat,
+                    headerVisible: false, // Hidden because we have custom header
+                    onPageChanged: (focusedDay) {
+                      _focusedDay = focusedDay;
+                    },
+                    selectedDayPredicate: (day) {
+                      return isSameDay(_selectedDay, day);
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                    calendarStyle: CalendarStyle(
+                      todayDecoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      todayTextStyle: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      selectedDecoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).primaryColor.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      markerDecoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      markersMaxCount: 1,
+                      outsideDaysVisible: false,
+                    ),
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600),
+                      weekendStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    eventLoader: (day) {
+                      return _getMedicinesForDay(day, provider.activeMedicines);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
 
               // Medicines List
               Expanded(
@@ -316,13 +290,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.medication_outlined, size: 80, color: Colors.grey[300]),
-                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(32),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceColor,
+                                shape: BoxShape.circle,
+                                boxShadow: AppTheme.neumorphicShadowInset,
+                              ),
+                              child: Icon(Icons.medication_liquid_rounded, size: 64, color: AppTheme.textSecondary.withOpacity(0.2)),
+                            ),
+                            const SizedBox(height: 24),
                             Text(
-                              'No medicines for ${DateFormat('MMM d').format(_selectedDay)}',
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: Colors.grey[400],
-                                  ),
+                              'No medications for today',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary.withOpacity(0.4),
+                              ),
                             ),
                           ],
                         ),
@@ -335,18 +319,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           
                           return Dismissible(
                             key: Key(medicine.id),
-                            direction: DismissDirection.horizontal,
-                            
-                            // Swipe Right (Take) Background
-                            background: Container(
-                              alignment: Alignment.centerLeft,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              color: AppTheme.successColor,
-                              child: const Icon(Icons.check_circle, color: Colors.white, size: 32),
-                            ),
+                            direction: DismissDirection.endToStart, // Only allow swipe left to delete
                             
                             // Swipe Left (Delete) Background
-                            secondaryBackground: Container(
+                            background: Container(
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.symmetric(horizontal: 20),
                               color: Theme.of(context).colorScheme.error,
@@ -354,30 +330,23 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             
                             confirmDismiss: (direction) async {
-                              if (direction == DismissDirection.startToEnd) {
-                                // Swipe Right: Mark as Taken
-                                provider.toggleTaken(medicine);
-                                return false; // Don't delete, just update state
-                              } else {
-                                // Swipe Left: Delete
-                                return true; // Yes, delete
-                              }
+                              // Only delete action remains
+                              return true;
                             },
                             
                             onDismissed: (direction) {
-                              if (direction == DismissDirection.endToStart) {
-                                provider.deleteMedicine(medicine.id);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('${medicine.name} deleted')),
-                                );
-                              }
+                              provider.deleteMedicine(medicine.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('${medicine.name} deleted')),
+                              );
                             },
                             
                             child: MedicineCard(
                               medicine: medicine,
+                              dateContext: _selectedDay, // Pass context date
                               onTaken: () {
-                                 // Redundant but safe if card keeps callback
-                                 provider.toggleTaken(medicine);
+                                 // Mark as taken for the selected day
+                                 provider.toggleTaken(medicine, date: _selectedDay);
                               },
                               onCardTap: () {
                                 Navigator.push(

@@ -34,6 +34,9 @@ class Medicine extends HiveObject {
   @HiveField(6)
   String? imagePath;
 
+  @HiveField(11, defaultValue: false)
+  bool isDeleted;
+
   @HiveField(7)
   List<DateTime> takenHistory; // To track when it was taken
 
@@ -45,9 +48,10 @@ class Medicine extends HiveObject {
     this.interval = 1,
     required this.startTime,
     this.imagePath,
-    this.takenHistory = const [],
+    List<DateTime>? takenHistory,
     this.timeSlots = const [],
     this.instruction,
     this.endDate,
-  });
+    this.isDeleted = false,
+  }) : takenHistory = takenHistory ?? [];
 }

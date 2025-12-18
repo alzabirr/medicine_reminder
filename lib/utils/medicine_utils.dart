@@ -132,4 +132,39 @@ class MedicineUtils {
       return '${duration.inMinutes}m';
     }
   }
+
+  /// Checks if all time slots for today have passed
+  /// Returns true if all scheduled times are in the past
+  static bool areAllTimeSlotsPassedToday(Medicine medicine) {
+    if (medicine.timeSlots.isEmpty) return false;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+    
+    // If medicine hasn't started yet, times haven't passed
+    if (today.isBefore(start)) return false;
+    
+    // If medicine has ended, consider it as "passed"
+    if (medicine.endDate != null) {
+      final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+      if (today.isAfter(end)) return true;
+    }
+
+    // Check if all time slots for today are in the past
+    for (final slot in medicine.timeSlots) {
+      final time = parseTime(slot);
+      if (time == null) continue;
+
+      final scheduledDateTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      
+      // If any time slot is still in the future, not all have passed
+      if (scheduledDateTime.isAfter(now)) {
+        return false;
+      }
+    }
+
+    // All time slots are in the past
+    return true;
+  }
 }

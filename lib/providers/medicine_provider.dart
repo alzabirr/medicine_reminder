@@ -9,8 +9,11 @@ class MedicineProvider extends ChangeNotifier {
   final NotificationService _notificationService = NotificationService();
   NotificationService get notificationService => _notificationService;
 
-  List<Medicine> _medicines = [];
-  List<Medicine> get medicines => _medicines;
+  // Getters for filtered lists
+  List<Medicine> _medicines = []; // Internal storage
+  List<Medicine> get medicines => _medicines; // All medicines (raw)
+  List<Medicine> get activeMedicines => _medicines.where((m) => !m.isDeleted).toList();
+  List<Medicine> get deletedMedicines => _medicines.where((m) => m.isDeleted).toList();
 
   bool _isLoading = true;
   bool get isLoading => _isLoading;
@@ -35,24 +38,42 @@ class MedicineProvider extends ChangeNotifier {
     await loadMedicines();
   }
 
+  // Soft Delete: Move to Trash
   Future<void> deleteMedicine(String id) async {
-    // Attempt to cancel all potential slots
-    // Since we don't have the slots easily here without fetching, we iterate common ones
-    // Or we could fetch the medicine first.
     final medicineIndex = _medicines.indexWhere((m) => m.id == id);
     if (medicineIndex != -1) {
        final medicine = _medicines[medicineIndex];
+       
+       // 1. Cancel notifications
        for (final slotString in medicine.timeSlots) {
-          // Robust label extraction matching addMedicine
           final pivotIndex = slotString.indexOf(':');
           final label = pivotIndex != -1 
               ? slotString.substring(0, pivotIndex).trim() 
-              : slotString; // Fallback if no colon (shouldn't happen with new logic, but safe)
-          
+              : slotString;
           await _notificationService.cancelNotification((id + label).hashCode);
        }
+       
+       // 2. Soft delete
+       medicine.isDeleted = true;
+       await medicine.save();
     }
+    
+    await loadMedicines();
+  }
 
+  // Restore from Trash
+  Future<void> restoreMedicine(Medicine medicine) async {
+    medicine.isDeleted = false;
+    await medicine.save();
+    
+    // Reschedule notifications
+    await _scheduleNotifications(medicine);
+    
+    await loadMedicines();
+  }
+
+  // Hard Delete: Permanent Removal
+  Future<void> deletePermanently(String id) async {
     await _databaseService.deleteMedicine(id);
     await loadMedicines();
   }
@@ -161,8 +182,8 @@ class MedicineProvider extends ChangeNotifier {
 
         await _notificationService.scheduleNotification(
           id: notificationId,
-          title: 'Medicine Reminder: ${medicine.name}',
-          body: 'Please take your ${medicine.name} (${medicine.dosage})',
+          title: 'Medi Reminder',
+          body: 'Time for ${medicine.name}${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}. Stay healthy! ✨',
           hour: hour,
           minute: minute,
           startDate: scheduleFromDate, // Pass the calculated start date
@@ -176,22 +197,59 @@ class MedicineProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> toggleTaken(Medicine medicine) async {
-    final now = DateTime.now();
-    // ... existing logic ...
+  Future<void> toggleTaken(Medicine medicine, {DateTime? date}) async {
+    final targetDate = date ?? DateTime.now();
+    
+    debugPrint('=== Toggle Taken Debug ===');
+    debugPrint('Medicine: ${medicine.name}');
+    debugPrint('Target Date: $targetDate');
+    debugPrint('Current takenHistory length: ${medicine.takenHistory.length}');
+    debugPrint('takenHistory type: ${medicine.takenHistory.runtimeType}');
+    
     final isTaken = medicine.takenHistory.any(
-      (d) => d.year == now.year && d.month == now.month && d.day == now.day,
+      (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
     );
 
+    debugPrint('Is already taken on target date: $isTaken');
+
     if (isTaken) {
-      medicine.takenHistory.removeWhere(
-        (d) => d.year == now.year && d.month == now.month && d.day == now.day,
-      );
+      debugPrint('Removing from takenHistory...');
+      try {
+        medicine.takenHistory.removeWhere(
+          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+        );
+      } catch (e) {
+        debugPrint('List immutable during remove, fixing...');
+        medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
+        medicine.takenHistory.removeWhere(
+          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+        );
+      }
     } else {
-      medicine.takenHistory.add(now);
+      debugPrint('Adding to takenHistory...');
+      try {
+        medicine.takenHistory.add(targetDate);
+      } catch (e) {
+        debugPrint('List immutable during add, fixing...');
+        medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
+        medicine.takenHistory.add(targetDate);
+      }
+      debugPrint('Successfully added to takenHistory');
     }
 
+    debugPrint('New takenHistory length: ${medicine.takenHistory.length}');
+    debugPrint('Saving medicine...');
+    
     await medicine.save();
+    
+    debugPrint('Medicine saved successfully');
+    
+    // Force reload from DB to ensure UI has latest state (fixes potential stale object issues)
+    await loadMedicines();
+    
+    debugPrint('Medicines reloaded');
+    debugPrint('========================');
+    
     notifyListeners();
   }
 }
