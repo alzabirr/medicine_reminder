@@ -726,7 +726,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 height: 55, // Slightly slimmer button
                 decoration: BoxDecoration(
                   color: Theme.of(context).primaryColor.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
                       color: Theme.of(context).primaryColor.withOpacity(0.2),

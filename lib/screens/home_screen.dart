@@ -281,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
               // Medicines List
               Expanded(
@@ -312,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 100),
+                        padding: const EdgeInsets.only(top: 8, bottom: 100),
                         itemCount: dailyMedicines.length,
                         itemBuilder: (context, index) {
                           final medicine = dailyMedicines[index];
@@ -322,11 +322,31 @@ class _HomeScreenState extends State<HomeScreen> {
                             direction: DismissDirection.endToStart, // Only allow swipe left to delete
                             
                             // Swipe Left (Delete) Background
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              color: Theme.of(context).colorScheme.error,
-                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                            background: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              child: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.red.shade400,
+                                      Colors.red.shade600,
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.2),
+                                      blurRadius: 10,
+                                      offset: const Offset(4, 0),
+                                    ),
+                                  ],
+                                ),
+                                child: const SizedBox.shrink(),
+                              ),
                             ),
                             
                             confirmDismiss: (direction) async {
