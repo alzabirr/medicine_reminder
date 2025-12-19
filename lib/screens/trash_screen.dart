@@ -12,18 +12,18 @@ class TrashScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor,
+          backgroundColor: Theme.of(context).cardColor,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           title: Text(
             "Delete Permanently?",
-            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 18),
+            style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color, fontWeight: FontWeight.w700, fontSize: 18),
             textAlign: TextAlign.center,
           ),
           content: Text(
             "This will permanently erase \"$medicineName\". You cannot undo this action.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), fontSize: 14),
           ),
           actionsAlignment: MainAxisAlignment.spaceEvenly,
           actions: [
@@ -60,7 +60,7 @@ class TrashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Consumer<MedicineProvider>(
           builder: (context, provider, child) {
@@ -80,19 +80,11 @@ class TrashScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
-                          color: AppTheme.textPrimary,
+                          color: Theme.of(context).textTheme.titleLarge?.color,
                           letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${deletedMedicines.length} items in bin',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textSecondary.withOpacity(0.7),
-                        ),
-                      ),
+                      const SizedBox(height: 4), 
                     ],
                   ),
                 ),
@@ -101,7 +93,7 @@ class TrashScreen extends StatelessWidget {
                   child: deletedMedicines.isEmpty
                       ? _buildEmptyState(context)
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                          padding: const EdgeInsets.only(top: 8, bottom: 120),
                           itemCount: deletedMedicines.length,
                           physics: const BouncingScrollPhysics(),
                           itemBuilder: (context, index) {

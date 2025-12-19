@@ -86,6 +86,7 @@ class MedicineProvider extends ChangeNotifier {
     required DateTime startDate,
     required DateTime endDate,
     String? imagePath,
+    int? frequency,
   }) async {
     // 1. Cancel old notifications using OLD slots
     for (final slotString in medicine.timeSlots) {
@@ -104,6 +105,7 @@ class MedicineProvider extends ChangeNotifier {
     medicine.startTime = startDate;
     medicine.endDate = endDate;
     if (imagePath != null) medicine.imagePath = imagePath;
+    if (frequency != null) medicine.interval = frequency;
     
     await medicine.save();
 
@@ -140,12 +142,26 @@ class MedicineProvider extends ChangeNotifier {
       scheduleFromDate = today;
     }
     
-    // 3. Check interval logic (weekly) - only for current medicines
-    if (medicine.interval == 7 && !today.isBefore(start)) {
-      if (medicine.startTime.weekday != now.weekday) {
-        debugPrint('Medicine ${medicine.name} is weekly and today is not the scheduled day. No notifications scheduled.');
-        return;
-      }
+    // 3. Interval Logic (Smart filtering for scheduling)
+    final diffDays = today.difference(start).inDays;
+    
+    bool shouldShowToday = false;
+    if (medicine.interval <= 1) {
+      shouldShowToday = true;
+    } else if (medicine.interval == 7) {
+      shouldShowToday = start.weekday == now.weekday;
+    } else {
+      // Every X Days logic
+      shouldShowToday = diffDays % medicine.interval == 0;
+    }
+
+    if (!shouldShowToday && !today.isBefore(start)) {
+      debugPrint('Medicine ${medicine.name} is not scheduled for today (Interval: ${medicine.interval}). No notification for today.');
+      // Note: This logic only blocks TODAY's notification. 
+      // AwesomeNotifications scheduling with NotificationCalendar(day: ...) 
+      // usually repeats BASED on that day. 
+      // However, for complex intervals like "Every 2 days", we can't easily 
+      // represent that in a single NotificationCalendar if it doesn't align with weekly/monthly.
     }
     
     // Medicine is valid, proceed with scheduling
@@ -183,7 +199,7 @@ class MedicineProvider extends ChangeNotifier {
         await _notificationService.scheduleNotification(
           id: notificationId,
           title: 'Medi Reminder',
-          body: 'Time for ${medicine.name}${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}. Stay healthy! ✨',
+          body: 'Time for ${medicine.name}${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}. Stay healthy! ',
           hour: hour,
           minute: minute,
           startDate: scheduleFromDate, // Pass the calculated start date
@@ -206,35 +222,32 @@ class MedicineProvider extends ChangeNotifier {
     debugPrint('Current takenHistory length: ${medicine.takenHistory.length}');
     debugPrint('takenHistory type: ${medicine.takenHistory.runtimeType}');
     
-    final isTaken = medicine.takenHistory.any(
+    final todayEntries = medicine.takenHistory.where(
       (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
-    );
+    ).toList();
+    
+    final isTakenMax = todayEntries.length >= medicine.timeSlots.length;
 
-    debugPrint('Is already taken on target date: $isTaken');
-
-    if (isTaken) {
-      debugPrint('Removing from takenHistory...');
+    if (!isTakenMax) {
+      debugPrint('Adding another dose for today...');
       try {
-        medicine.takenHistory.removeWhere(
-          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
-        );
+        medicine.takenHistory.add(targetDate);
       } catch (e) {
-        debugPrint('List immutable during remove, fixing...');
         medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
-        medicine.takenHistory.removeWhere(
-          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
-        );
+        medicine.takenHistory.add(targetDate);
       }
     } else {
-      debugPrint('Adding to takenHistory...');
+      debugPrint('Resetting doses for today (Cycle)...');
       try {
-        medicine.takenHistory.add(targetDate);
+        medicine.takenHistory.removeWhere(
+          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+        );
       } catch (e) {
-        debugPrint('List immutable during add, fixing...');
         medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
-        medicine.takenHistory.add(targetDate);
+        medicine.takenHistory.removeWhere(
+          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+        );
       }
-      debugPrint('Successfully added to takenHistory');
     }
 
     debugPrint('New takenHistory length: ${medicine.takenHistory.length}');

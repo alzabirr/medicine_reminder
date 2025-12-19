@@ -21,12 +21,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final _nameController = TextEditingController();
 
   String _selectedType = 'Tablet';
-  final List<String> _types = ['Tablet','Pill', 'Liquid', 'Injection', 'Drop'];
+  final List<String> _types = ['Tablet', 'Pill', 'Liquid', 'Injection', 'Drop', 'Topical', 'Inhaler'];
 
   final Map<String, TimeOfDay> _selectedTimeSlots = {}; // {'Morning': TimeOfDay...}
   String _selectedInstruction = 'After Meal'; // 'Before Meal', 'After Meal', 'Any Time'
 
-  DateTime _startDate = DateTime.now();
+  DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
   String _selectedDuration = '1 Month';
   // Removed intermediate options as requested, but kept 2 Weeks
   final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', 'Pick Date'];
@@ -46,7 +46,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
          // ideally adds it or handles it, but robust enough for now
       }
       _selectedInstruction = m.instruction ?? 'After Meal';
-      _startDate = m.startTime;
+      _startDate = DateTime(m.startTime.year, m.startTime.month, m.startTime.day);
       if (m.imagePath != null) _image = File(m.imagePath!);
       
       // Check if custom duration
@@ -68,7 +68,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
          
          if (!foundStandard) {
            _selectedDuration = 'Pick Date';
-           _customEndDate = m.endDate;
+           _customEndDate = DateTime(m.endDate!.year, m.endDate!.month, m.endDate!.day);
          }
       }
       
@@ -110,14 +110,17 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
     switch (_selectedDuration) {
       case '1 Week':
-        return _startDate.add(const Duration(days: 7));
+        return _startDate.add(const Duration(days: 6));
       case '2 Weeks':
-        return _startDate.add(const Duration(days: 14));
+        return _startDate.add(const Duration(days: 13));
       case '1 Month':
-        return DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+        // Inclusive month: if starts 20th, ends 19th of next month
+        final nextMonth = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+        return nextMonth.subtract(const Duration(days: 1));
       default:
-        // Default to 1 month if something goes wrong
-        return DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+        // Default to 1 month inclusive
+        final nextMonth = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+        return nextMonth.subtract(const Duration(days: 1));
     }
   }
 
@@ -159,10 +162,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _startDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      initialDate: _startDate.isBefore(today) ? today : _startDate,
+      firstDate: today,
       lastDate: DateTime(2030),
     );
     if (picked != null && picked != _startDate) {
@@ -198,6 +203,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             startDate: _startDate,
             endDate: _calculatedEndDate,
             imagePath: _image?.path,
+            frequency: 1, // Default back to daily
          );
          ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Medicine Updated Successfully! 💊')),
@@ -214,6 +220,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           instruction: _selectedInstruction,
           endDate: _calculatedEndDate,
           imagePath: _image?.path,
+          interval: 1, // Default back to daily
         );
 
         Provider.of<MedicineProvider>(context, listen: false).addMedicine(medicine);
@@ -239,6 +246,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         return Icons.vaccines;
       case 'drop':
         return Icons.water_drop;
+      case 'topical':
+        return Icons.healing;
+      case 'inhaler':
+        return Icons.air_rounded;
       default:
         return Icons.medication_liquid;
     }
@@ -366,17 +377,17 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: Theme.of(context).textTheme.titleLarge?.color, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.medicine != null ? 'Edit Medicine' : 'Add Medicine',
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+          style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
       ),
@@ -396,9 +407,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     width: 150,
                     height: 150,
                     decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor,
+                      color: Theme.of(context).cardColor,
                       shape: BoxShape.circle,
-                      boxShadow: AppTheme.neumorphicShadow,
+                      boxShadow: AppTheme.getNeumorphicShadow(context),
                     ),
                     child: Stack(
                       alignment: Alignment.center,
@@ -408,8 +419,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           height: 130,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppTheme.surfaceColor,
-                            boxShadow: AppTheme.neumorphicShadowInset,
+                            color: Theme.of(context).cardColor,
+                            boxShadow: AppTheme.getNeumorphicShadowInset(context),
                           ),
                         ),
                         Container(
@@ -417,7 +428,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           height: 115,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppTheme.surfaceColor,
+                            color: Theme.of(context).cardColor,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: _image != null
@@ -453,19 +464,25 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               _buildSectionLabel('Medicine Name'),
               const SizedBox(height: 12),
               Container(
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.neumorphicShadowInset,
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: AppTheme.getNeumorphicShadowInset(context),
                 ),
                 child: TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    hintText: 'e.g. Paracetamol',
-                    prefixIcon: Icon(Icons.medication, color: AppTheme.textSecondary.withOpacity(0.5)),
+                    hintText: 'Type your medicine name',
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 10),
+                      child: Icon(Icons.medication, color: AppTheme.textSecondary.withOpacity(0.5), size: 20),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 40),
                     filled: false,
+                    isDense: true,
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     hintStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.4)),
                   ),
                   style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
@@ -475,27 +492,35 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               const SizedBox(height: 20),
 
               // Type Selector
-              _buildSectionLabel('TypeOf Medicine'),
+              _buildSectionLabel('Types of Medicine'),
               const SizedBox(height: 12),
               Container(
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.neumorphicShadowInset,
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: AppTheme.getNeumorphicShadowInset(context),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: _selectedType,
-                  icon: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withOpacity(0.5)),
+                  icon: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withOpacity(0.5)),
+                  ),
                   decoration: InputDecoration(
-                    prefixIcon: Icon(Icons.category_rounded, color: AppTheme.textSecondary.withOpacity(0.5), size: 18),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 10),
+                      child: Icon(Icons.category_rounded, color: AppTheme.textSecondary.withOpacity(0.5), size: 20),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 40),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14), // Balanced vertical padding
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
                   dropdownColor: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(25),
                   items: _types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                   onChanged: (val) => setState(() => _selectedType = val!),
                 ),
@@ -550,20 +575,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           height: 60,
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: AppTheme.neumorphicShadowInset,
+                            boxShadow: AppTheme.getNeumorphicShadowInset(context),
                           ),
                           child: DropdownButtonFormField<String>(
                             value: _selectedDuration,
-                            icon: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withOpacity(0.5)),
+                            icon: Icon(Icons.expand_more_rounded, color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5)),
                             decoration: const InputDecoration(
                               border: InputBorder.none, 
                               isDense: true,
                               contentPadding: EdgeInsets.symmetric(vertical: 18), // Centers text in 60h container
                             ),
-                            style: TextStyle(color: AppTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
-                            dropdownColor: AppTheme.surfaceColor,
+                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 15, fontWeight: FontWeight.w600),
+                            dropdownColor: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(20),
                             selectedItemBuilder: (ctx) => _durations.map((item) {
                               if (item == 'Pick Date' && _customEndDate != null) {
@@ -602,7 +627,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ),
                   child: Text(
                     'ENDS: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
-                    style: TextStyle(color: AppTheme.textSecondary.withOpacity(0.7), fontWeight: FontWeight.w700, fontSize: 10),
+                    style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700, fontSize: 10),
                   ),
                 ),
               ),
@@ -696,7 +721,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: AppTheme.textPrimary.withOpacity(0.8),
+          color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
           fontWeight: FontWeight.w800,
           fontSize: 11,
           letterSpacing: 1.2,

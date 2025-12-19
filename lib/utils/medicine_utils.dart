@@ -35,7 +35,7 @@ class MedicineUtils {
   /// For future medicines (start date in the future), returns time until start date.
   /// For current medicines, returns time until the next dose today/tomorrow.
   /// Returns null if all doses have passed and medicine has ended.
-  static Duration? getTimeUntilNextDose(Medicine medicine) {
+  static Duration? getTimeUntilNextDose(Medicine medicine, {int takenCount = 0}) {
     if (medicine.timeSlots.isEmpty) return null;
 
     final now = DateTime.now();
@@ -75,10 +75,21 @@ class MedicineUtils {
     // For current medicines, find next dose
     DateTime? nextDoseDate;
 
-    // Check today's slots
-    for (final slot in medicine.timeSlots) {
-      final time = parseTime(slot);
-      if (time == null) continue;
+    // Sort time slots to ensure we skip the earliest ones correctly
+    final List<TimeOfDay> sortedSlots = medicine.timeSlots
+        .map((s) => parseTime(s))
+        .where((t) => t != null)
+        .cast<TimeOfDay>()
+        .toList()
+      ..sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
+
+    // Check today's slots, skipping those already taken
+    int skipped = 0;
+    for (final time in sortedSlots) {
+      if (skipped < takenCount) {
+        skipped++;
+        continue;
+      }
 
       final scheduledDateTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
       
@@ -89,30 +100,26 @@ class MedicineUtils {
       }
     }
 
-    // If no more slots today, check if we can look at tomorrow
+    // If no more slots today (everyone taken or passed), check future days
     if (nextDoseDate == null) {
-      // Check if medicine has an end date and if tomorrow would be beyond it
-      final tomorrow = today.add(const Duration(days: 1));
+      // Find the next VALID scheduled day
+      DateTime searchDay = today.add(const Duration(days: 1));
       
-      if (medicine.endDate != null) {
-        final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-        if (tomorrow.isAfter(end)) {
-          // Medicine ends today, no more doses
-          return null;
+      // Limit search to 365 days to prevent infinite loops (if medicine ended)
+      for (int i = 0; i < 365; i++) {
+        if (medicine.endDate != null) {
+          final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+          if (searchDay.isAfter(end)) return null; 
         }
-      }
-      
-      // Check tomorrow's slots
-      for (final slot in medicine.timeSlots) {
-        final time = parseTime(slot);
-        if (time == null) continue;
 
-        // Tomorrow
-        final scheduledDateTime = DateTime(now.year, now.month, now.day, time.hour, time.minute).add(const Duration(days: 1));
-        
-        if (nextDoseDate == null || scheduledDateTime.isBefore(nextDoseDate)) {
-          nextDoseDate = scheduledDateTime;
+        if (isScheduledForDay(medicine, searchDay)) {
+          if (sortedSlots.isNotEmpty) {
+            final time = sortedSlots.first;
+            nextDoseDate = DateTime(searchDay.year, searchDay.month, searchDay.day, time.hour, time.minute);
+            break;
+          }
         }
+        searchDay = searchDay.add(const Duration(days: 1));
       }
     }
 
@@ -127,44 +134,72 @@ class MedicineUtils {
     if (duration.inDays > 0) {
       return '${duration.inDays}d ${duration.inHours % 24}h';
     } else if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes % 60}m';
+      final minutes = duration.inMinutes % 60;
+      final seconds = duration.inSeconds % 60;
+      return '${duration.inHours}h ${minutes}m ${seconds}s';
     } else {
-      return '${duration.inMinutes}m';
+      final seconds = duration.inSeconds % 60;
+      return '${duration.inMinutes}m ${seconds}s';
     }
   }
 
-  /// Checks if all time slots for today have passed
-  /// Returns true if all scheduled times are in the past
-  static bool areAllTimeSlotsPassedToday(Medicine medicine) {
+  static bool areAllTimeSlotsPassedToday(Medicine medicine, {int takenCount = 0, DateTime? checkDate}) {
     if (medicine.timeSlots.isEmpty) return false;
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = checkDate ?? DateTime(now.year, now.month, now.day);
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+
+    // 1. If not scheduled for this day, it's technically "passed" (nothing to do)
+    if (!isScheduledForDay(medicine, todayMidnight)) return true;
+
+    // 2. Sort time slots
+    final List<TimeOfDay> sortedSlots = medicine.timeSlots
+        .map((s) => parseTime(s))
+        .where((t) => t != null)
+        .cast<TimeOfDay>()
+        .toList()
+      ..sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
+
+    int passedOrTaken = 0;
+    for (int i = 0; i < sortedSlots.length; i++) {
+       if (i < takenCount) {
+         passedOrTaken++;
+         continue;
+       }
+       
+       final time = sortedSlots[i];
+       // Check if this specific slot time has passed on the target day
+       final scheduledDateTime = DateTime(todayMidnight.year, todayMidnight.month, todayMidnight.day, time.hour, time.minute);
+       
+       if (scheduledDateTime.isBefore(now)) {
+         passedOrTaken++;
+       }
+    }
+
+    return passedOrTaken >= sortedSlots.length;
+  }
+
+  /// Returns true if the medicine is scheduled for the given date based on its frequency/interval.
+  static bool isScheduledForDay(Medicine medicine, DateTime day) {
+    final checkDay = DateTime(day.year, day.month, day.day);
     final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
     
-    // If medicine hasn't started yet, times haven't passed
-    if (today.isBefore(start)) return false;
-    
-    // If medicine has ended, consider it as "passed"
+    // 1. Check Start Date
+    if (checkDay.isBefore(start)) return false;
+
+    // 2. Check End Date
     if (medicine.endDate != null) {
       final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-      if (today.isAfter(end)) return true;
+      if (checkDay.isAfter(end)) return false;
     }
 
-    // Check if all time slots for today are in the past
-    for (final slot in medicine.timeSlots) {
-      final time = parseTime(slot);
-      if (time == null) continue;
-
-      final scheduledDateTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-      
-      // If any time slot is still in the future, not all have passed
-      if (scheduledDateTime.isAfter(now)) {
-        return false;
-      }
-    }
-
-    // All time slots are in the past
-    return true;
+    // 3. Interval Logic
+    if (medicine.interval <= 1) return true; // Every Day
+    if (medicine.interval == 7) return start.weekday == day.weekday; // Weekly
+    
+    // Every X Days
+    final diffDays = checkDay.difference(start).inDays;
+    return diffDays % medicine.interval == 0;
   }
 }

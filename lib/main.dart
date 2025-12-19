@@ -39,10 +39,8 @@ void main() async {
   await medicineProvider.init();
   
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => medicineProvider),
-      ],
+    ChangeNotifierProvider(
+      create: (_) => medicineProvider,
       child: const MedicineReminderApp(),
     ),
   );
@@ -58,7 +56,6 @@ class MedicineReminderApp extends StatelessWidget {
        
       restorationScopeId: 'medi_app',
       theme: AppTheme.lightTheme,
-
       home: const MainScreen(),
     );
   }

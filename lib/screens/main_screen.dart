@@ -1,8 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:medi/core/theme.dart';
 import 'package:medi/screens/add_medicine_screen.dart';
 import 'package:medi/screens/home_screen.dart';
+
+
 import 'package:medi/screens/trash_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -36,7 +37,8 @@ class _MainScreenState extends State<MainScreen> {
             ),
           );
         },
-        child: _screens[_currentIndex == 2 ? 1 : 0],
+        child: _currentIndex == 2 ? const TrashScreen(key: ValueKey('trash')) : 
+               const HomeScreen(key: ValueKey('home')),
       ),
       bottomNavigationBar: ClipRRect(
         child: BackdropFilter(
@@ -44,19 +46,19 @@ class _MainScreenState extends State<MainScreen> {
           child: Theme(
             data: Theme.of(context).copyWith(
               navigationBarTheme: NavigationBarThemeData(
-                backgroundColor: AppTheme.backgroundColor.withOpacity(0.4),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.4),
                 indicatorColor: Theme.of(context).primaryColor.withOpacity(0.1),
                 labelTextStyle: MaterialStateProperty.resolveWith((states) {
                   if (states.contains(MaterialState.selected)) {
                     return TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w700, fontSize: 12);
                   }
-                  return TextStyle(color: AppTheme.textSecondary.withOpacity(0.6), fontWeight: FontWeight.w500, fontSize: 12);
+                  return TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), fontWeight: FontWeight.w500, fontSize: 12);
                 }),
                 iconTheme: MaterialStateProperty.resolveWith((states) {
                   if (states.contains(MaterialState.selected)) {
                     return IconThemeData(color: Theme.of(context).primaryColor, size: 26);
                   }
-                  return IconThemeData(color: AppTheme.textSecondary.withOpacity(0.6), size: 24);
+                  return IconThemeData(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), size: 24);
                 }),
               ),
             ),
@@ -75,12 +77,13 @@ class _MainScreenState extends State<MainScreen> {
                   });
                 }
               },
-              destinations: [
+              destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.grid_view_rounded),
                   selectedIcon: Icon(Icons.grid_view_rounded),
                   label: 'Schedule',
                 ),
+
                 NavigationDestination(
                   icon: Icon(Icons.add_circle_rounded, size: 38),
                   selectedIcon: Icon(Icons.add_circle_rounded, size: 38),

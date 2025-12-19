@@ -301,6 +301,10 @@ class MedicineDetailsScreen extends StatelessWidget {
         return Icons.vaccines;
       case 'drop':
         return Icons.water_drop;
+      case 'topical':
+        return Icons.clean_hands_rounded;
+      case 'inhaler':
+        return Icons.air_rounded;
       default:
         return Icons.medication_liquid;
     }
