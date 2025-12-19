@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:medi/models/medicine.dart';
@@ -33,6 +34,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   DateTime? _customEndDate; // Store custom end date
 
   File? _image;
+  
+  // Hint Animation variables
+  String _displayHintText = '';
+  final String _fullHintText = 'Type your medicine name...';
+  Timer? _hintTimer;
+  int _hintCharIndex = 0;
 
   @override
   void initState() {
@@ -102,6 +109,38 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
          }
       }
     }
+    _startHintAnimation();
+  }
+
+  void _startHintAnimation() {
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+      if (_hintCharIndex < _fullHintText.length) {
+        if (mounted) {
+          setState(() {
+            _displayHintText += _fullHintText[_hintCharIndex];
+            _hintCharIndex++;
+          });
+        }
+      } else {
+        timer.cancel();
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              _displayHintText = '';
+              _hintCharIndex = 0;
+            });
+            _startHintAnimation();
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _hintTimer?.cancel();
+    super.dispose();
   }
 
   DateTime get _calculatedEndDate {
@@ -467,13 +506,13 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(50),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: AppTheme.getNeumorphicShadowInset(context),
                 ),
                 child: TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    hintText: 'Type your medicine name',
+                    hintText: _displayHintText,
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 16, right: 10),
                       child: Icon(Icons.medication, color: AppTheme.textSecondary.withOpacity(0.5), size: 20),
@@ -498,7 +537,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(50),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: AppTheme.getNeumorphicShadowInset(context),
                 ),
                 child: DropdownButtonFormField<String>(
@@ -520,7 +559,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ),
                   style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
                   dropdownColor: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(20),
                   items: _types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                   onChanged: (val) => setState(() => _selectedType = val!),
                 ),
@@ -623,7 +662,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.textSecondary.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'ENDS: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
