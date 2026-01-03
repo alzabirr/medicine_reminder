@@ -34,12 +34,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   DateTime? _customEndDate; // Store custom end date
 
   File? _image;
-  
-  // Hint Animation variables
-  String _displayHintText = '';
-  final String _fullHintText = 'Type your medicine name...';
-  Timer? _hintTimer;
-  int _hintCharIndex = 0;
 
   @override
   void initState() {
@@ -109,37 +103,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
          }
       }
     }
-    _startHintAnimation();
-  }
-
-  void _startHintAnimation() {
-    _hintTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
-      if (_hintCharIndex < _fullHintText.length) {
-        if (mounted) {
-          setState(() {
-            _displayHintText += _fullHintText[_hintCharIndex];
-            _hintCharIndex++;
-          });
-        }
-      } else {
-        timer.cancel();
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            setState(() {
-              _displayHintText = '';
-              _hintCharIndex = 0;
-            });
-            _startHintAnimation();
-          }
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _hintTimer?.cancel();
     super.dispose();
   }
 
@@ -352,7 +320,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ? '$label (${selectedTime.format(context)})' 
                   : label,
               style: TextStyle(
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withOpacity(0.5),
+                color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withValues(alpha: 0.5),
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 fontSize: 13,
               ),
@@ -381,7 +349,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withOpacity(0.5),
+            color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withValues(alpha: 0.5),
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             fontSize: 13,
           ),
@@ -390,10 +358,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     );
   }
 
+  bool _isDataRetrieved = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _retrieveLostData();
+    if (!_isDataRetrieved) {
+      _isDataRetrieved = true;
+      _retrieveLostData();
+    }
   }
 
   Future<void> _retrieveLostData() async {
@@ -475,7 +448,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               : Icon(
                                   _getIconForType(_selectedType),
                                   size: 48,
-                                  color: Theme.of(context).primaryColor.withOpacity(0.6),
+                                  color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
                                 ),
                         ),
                         // Small Camera Action Overlay
@@ -502,32 +475,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               // Title Section - Name
               _buildSectionLabel('Medicine Name'),
               const SizedBox(height: 12),
-              Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.getNeumorphicShadowInset(context),
-                ),
-                child: TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    hintText: _displayHintText,
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(Icons.medication, color: AppTheme.textSecondary.withOpacity(0.5), size: 20),
-                    ),
-                    prefixIconConstraints: const BoxConstraints(minWidth: 40),
-                    filled: false,
-                    isDense: true,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    hintStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.4)),
-                  ),
-                  style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
-                  validator: (value) => (value == null || value.isEmpty) ? 'Please enter name' : null,
-                ),
-              ),
+              
+              // Optimized Animated Input Field
+              _MedicineNameInput(controller: _nameController),
+              
               const SizedBox(height: 20),
 
               // Type Selector
@@ -545,12 +496,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   value: _selectedType,
                   icon: Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withOpacity(0.5)),
+                    child: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
                   ),
                   decoration: InputDecoration(
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(Icons.category_rounded, color: AppTheme.textSecondary.withOpacity(0.5), size: 20),
+                      child: Icon(Icons.category_rounded, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 20),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 40),
                     border: InputBorder.none,
@@ -587,7 +538,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.calendar_month, color: AppTheme.textSecondary.withOpacity(0.5), size: 18),
+                                Icon(Icons.calendar_month, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 18),
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
@@ -620,7 +571,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           ),
                           child: DropdownButtonFormField<String>(
                             value: _selectedDuration,
-                            icon: Icon(Icons.expand_more_rounded, color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5)),
+                            icon: Icon(Icons.expand_more_rounded, color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5)),
                             decoration: const InputDecoration(
                               border: InputBorder.none, 
                               isDense: true,
@@ -661,7 +612,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.textSecondary.withOpacity(0.05),
+                    color: AppTheme.textSecondary.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -702,49 +653,44 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 8),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor.withValues(alpha: 0.95), // Solid, slightly transparent background
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.4), width: 0.5),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              offset: const Offset(0, -2),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          onTap: _saveMedicine,
           child: Container(
-            padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 8),
+            height: 55, // Slightly slimmer button
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2), // More transparent white-tinted glass
-              border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.4), width: 0.5), // Subtle glass highlight
-              ),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.01),
-                  offset: const Offset(0, -1),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                  offset: const Offset(0, 4),
                   blurRadius: 10,
                 ),
               ],
             ),
-            child: GestureDetector(
-              onTap: _saveMedicine,
-              child: Container(
-                height: 55, // Slightly slimmer button
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).primaryColor.withOpacity(0.2),
-                      offset: const Offset(0, 4),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    widget.medicine != null ? 'Update Reminder' : 'Save Reminder',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+            child: Center(
+              child: Text(
+                widget.medicine != null ? 'Update Reminder' : 'Save Reminder',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),
@@ -754,16 +700,122 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     );
   }
 
+
   Widget _buildSectionLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+          color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.8),
           fontWeight: FontWeight.w800,
           fontSize: 11,
           letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+// Optimized widget to handle hint animation without re-rendering entire screen
+class _MedicineNameInput extends StatefulWidget {
+  final TextEditingController controller;
+  const _MedicineNameInput({required this.controller});
+
+  @override
+  State<_MedicineNameInput> createState() => _MedicineNameInputState();
+}
+
+class _MedicineNameInputState extends State<_MedicineNameInput> {
+  // Hint Animation variables
+  String _displayHintText = '';
+  final String _fullHintText = 'Type your medicine name...';
+  Timer? _hintTimer;
+  int _hintCharIndex = 0;
+  bool _animationCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start animation only if text is empty
+    if (widget.controller.text.isEmpty) {
+      _startHintAnimation();
+    }
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    if (widget.controller.text.isNotEmpty) {
+       // Stop animation if user types
+       _stopAnimation();
+    }
+  }
+
+  void _stopAnimation() {
+    _hintTimer?.cancel();
+    if (mounted) {
+       setState(() {
+         // Reset to full text so it looks normal if they delete text later
+         _displayHintText = _fullHintText; 
+       });
+    }
+  }
+
+  void _startHintAnimation() {
+    // Prevent multiple timers
+    _hintTimer?.cancel();
+    
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+      if (_hintCharIndex < _fullHintText.length) {
+        if (mounted) {
+          setState(() {
+            _displayHintText += _fullHintText[_hintCharIndex];
+            _hintCharIndex++;
+          });
+        }
+      } else {
+        // Animation finished one cycle
+        timer.cancel();
+        _animationCompleted = true;
+        // Don't restart loop, just leave it full. CONSTANT REBUILDING CAUSES LAG.
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _hintTimer?.cancel();
+    widget.controller.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppTheme.getNeumorphicShadowInset(context),
+        ),
+        child: TextFormField(
+          controller: widget.controller,
+          decoration: InputDecoration(
+            hintText: _displayHintText,
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 10),
+              child: Icon(Icons.medication, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 20),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 40),
+            filled: false,
+            isDense: true,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            hintStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.4)),
+          ),
+          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
+          validator: (value) => (value == null || value.isEmpty) ? 'Please enter name' : null,
         ),
       ),
     );

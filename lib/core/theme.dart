@@ -95,13 +95,13 @@ class AppTheme {
         fillColor: surfaceColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        hintStyle: TextStyle(color: textSecondary.withOpacity(0.4)),
+        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.4)),
         prefixIconColor: textSecondary,
       ),
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
-        indicatorColor: primaryColor.withOpacity(0.1),
+        indicatorColor: primaryColor.withValues(alpha: 0.1),
         labelTextStyle: MaterialStateProperty.all(
           GoogleFonts.outfit(color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
         ),

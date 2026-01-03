@@ -105,14 +105,12 @@ class NotificationService {
         backgroundColor: Colors.deepPurple,
       ),
       schedule: NotificationCalendar(
-        year: scheduleDate.year,
-        month: scheduleDate.month,
-        day: scheduleDate.day,
+        // year, month, day removed to allow daily repetition
         hour: hour,
         minute: minute,
         second: 0,
         millisecond: 0,
-        repeats: true, // Daily from the start date
+        repeats: true, 
         allowWhileIdle: true,
         preciseAlarm: true,
       ),

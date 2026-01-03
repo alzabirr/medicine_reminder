@@ -23,7 +23,7 @@ class TrashScreen extends StatelessWidget {
           content: Text(
             "This will permanently erase \"$medicineName\". You cannot undo this action.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), fontSize: 14),
+            style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7), fontSize: 14),
           ),
           actionsAlignment: MainAxisAlignment.spaceEvenly,
           actions: [
@@ -33,7 +33,7 @@ class TrashScreen extends StatelessWidget {
             ),
             Container(
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: TextButton(
@@ -110,7 +110,7 @@ class TrashScreen extends StatelessWidget {
                                   background: Container(
                                     alignment: Alignment.centerLeft,
                                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                                    color: AppTheme.successColor.withOpacity(0.15),
+                                    color: AppTheme.successColor.withValues(alpha: 0.15),
                                     child: Icon(Icons.restore_from_trash_rounded, color: AppTheme.successColor, size: 28),
                                   ),
                                   
@@ -118,7 +118,7 @@ class TrashScreen extends StatelessWidget {
                                   secondaryBackground: Container(
                                     alignment: Alignment.centerRight,
                                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                                    color: Theme.of(context).colorScheme.error.withOpacity(0.15),
+                                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
                                     child: Icon(Icons.delete_forever_rounded, color: Theme.of(context).colorScheme.error, size: 28),
                                   ),
 
@@ -177,7 +177,7 @@ class TrashScreen extends StatelessWidget {
             child: Icon(
               Icons.delete_sweep_rounded,
               size: 48,
-              color: AppTheme.textSecondary.withOpacity(0.2),
+              color: AppTheme.textSecondary.withValues(alpha: 0.2),
             ),
           ),
           const SizedBox(height: 24),
@@ -186,7 +186,7 @@ class TrashScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary.withOpacity(0.6),
+              color: AppTheme.textPrimary.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
@@ -194,7 +194,7 @@ class TrashScreen extends StatelessWidget {
             'Deleted medicines will appear here',
             style: TextStyle(
               fontSize: 14,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: AppTheme.textSecondary.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 60), // Space for bottom nav

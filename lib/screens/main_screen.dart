@@ -46,19 +46,19 @@ class _MainScreenState extends State<MainScreen> {
           child: Theme(
             data: Theme.of(context).copyWith(
               navigationBarTheme: NavigationBarThemeData(
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.4),
-                indicatorColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.4),
+                indicatorColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                 labelTextStyle: MaterialStateProperty.resolveWith((states) {
                   if (states.contains(MaterialState.selected)) {
                     return TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w700, fontSize: 12);
                   }
-                  return TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), fontWeight: FontWeight.w500, fontSize: 12);
+                  return TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6), fontWeight: FontWeight.w500, fontSize: 12);
                 }),
                 iconTheme: MaterialStateProperty.resolveWith((states) {
                   if (states.contains(MaterialState.selected)) {
                     return IconThemeData(color: Theme.of(context).primaryColor, size: 26);
                   }
-                  return IconThemeData(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), size: 24);
+                  return IconThemeData(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6), size: 24);
                 }),
               ),
             ),

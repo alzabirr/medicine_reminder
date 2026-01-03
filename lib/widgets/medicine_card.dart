@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart'; // Removed unused
+
 import 'package:medi/models/medicine.dart';
 import 'package:medi/core/theme.dart';
 import 'package:medi/utils/medicine_utils.dart';
@@ -185,7 +186,7 @@ class _MedicineCardState extends State<MedicineCard> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -226,8 +227,8 @@ class _MedicineCardState extends State<MedicineCard> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: isDone
-                                    ? AppTheme.successColor.withOpacity(0.1)
-                                    : Theme.of(context).primaryColor.withOpacity(0.05),
+                                    ? AppTheme.successColor.withValues(alpha: 0.1)
+                                    : Theme.of(context).primaryColor.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -255,7 +256,7 @@ class _MedicineCardState extends State<MedicineCard> {
                         // Instruction
                         Row(
                           children: [
-                            Icon(Icons.restaurant_menu, size: 12, color: AppTheme.textSecondary.withOpacity(0.6)),
+                            Icon(Icons.restaurant_menu, size: 12, color: AppTheme.textSecondary.withValues(alpha: 0.6)),
                             const SizedBox(width: 4),
                             Text(
                               widget.medicine.instruction ?? 'Any Time',
@@ -285,7 +286,7 @@ class _MedicineCardState extends State<MedicineCard> {
                                   Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(Icons.alarm, size: 12, color: Theme.of(context).primaryColor),

@@ -45,7 +45,9 @@ class MedicineDetailsScreen extends StatelessWidget {
                       builder: (context) => AddMedicineScreen(medicine: latestMedicine),
                     ),
                   ).then((_) {
-                     Navigator.pop(context);
+                     if (context.mounted) {
+                       Navigator.pop(context);
+                     }
                   });
                 },
               ),
@@ -109,7 +111,7 @@ class MedicineDetailsScreen extends StatelessWidget {
                         : Icon(
                             _getIconForType(med.type),
                             size: 60,
-                            color: Theme.of(context).primaryColor.withOpacity(0.8),
+                            color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
                           ),
                   ),
                 ],
@@ -203,14 +205,14 @@ class MedicineDetailsScreen extends StatelessWidget {
         Text(
           title.toUpperCase(),
           style: TextStyle(
-            color: AppTheme.textSecondary.withOpacity(0.6),
+            color: AppTheme.textSecondary.withValues(alpha: 0.6),
             letterSpacing: 1.2,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Divider(color: AppTheme.textSecondary.withOpacity(0.1))),
+        Expanded(child: Divider(color: AppTheme.textSecondary.withValues(alpha: 0.1))),
       ],
     );
   }
@@ -257,7 +259,7 @@ class MedicineDetailsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 18, color: accentColor),

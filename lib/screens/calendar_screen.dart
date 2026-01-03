@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/providers/medicine_provider.dart';
-import 'package:medi/widgets/medicine_card.dart';
+// import 'package:medi/widgets/medicine_card.dart'; // Removed unused
+
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 

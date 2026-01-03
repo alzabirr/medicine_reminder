@@ -51,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
                    Container(
                      padding: const EdgeInsets.all(16),
                      decoration: BoxDecoration(
-                       color: Theme.of(context).primaryColor.withOpacity(0.1),
+                       color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                        shape: BoxShape.circle,
                      ),
                      child: Icon(
@@ -197,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: AppTheme.textSecondary.withOpacity(0.6),
+                              color: AppTheme.textSecondary.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -246,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     calendarStyle: CalendarStyle(
                       todayDecoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       todayTextStyle: TextStyle(
@@ -258,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Theme.of(context).primaryColor.withOpacity(0.3),
+                            color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -266,15 +266,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       markerDecoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.5),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
                       markersMaxCount: 1,
                       outsideDaysVisible: false,
                     ),
                     daysOfWeekStyle: DaysOfWeekStyle(
-                      weekdayStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600),
-                      weekendStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600),
+                      weekdayStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w600),
+                      weekendStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                     eventLoader: (day) {
                       return _getMedicinesForDay(day, provider.activeMedicines);
@@ -297,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: AppTheme.neumorphicShadowInset,
                               ),
-                              child: Icon(Icons.medication_liquid_rounded, size: 64, color: AppTheme.textSecondary.withOpacity(0.2)),
+                              child: Icon(Icons.medication_liquid_rounded, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.2)),
                             ),
                             const SizedBox(height: 24),
                             Text(
@@ -305,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.textSecondary.withOpacity(0.4),
+                                color: AppTheme.textSecondary.withValues(alpha: 0.4),
                               ),
                             ),
                           ],
@@ -339,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(24),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.red.withOpacity(0.2),
+                                      color: Colors.red.withValues(alpha: 0.2),
                                       blurRadius: 10,
                                       offset: const Offset(4, 0),
                                     ),

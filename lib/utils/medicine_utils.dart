@@ -5,7 +5,8 @@ class MedicineUtils {
   /// Parses a time string like "Morning: 08:00 AM" or "20:00" into a TimeOfDay.
   static TimeOfDay? parseTime(String timeSlot) {
     try {
-      final pivotIndex = timeSlot.indexOf(':');
+      // final pivotIndex = timeSlot.indexOf(':'); // Removed unused
+
       // If we have a label like "Morning: ...", skip it. 
       // But wait, hours also have ':' (e.g. 08:00). 
       // We need to be careful. Usually labels are "Label: 08:00 AM".

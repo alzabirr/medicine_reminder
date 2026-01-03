@@ -23,7 +23,8 @@ class DatabaseService {
       for (var medicine in medicines) {
         // Check if takenHistory is immutable by trying to add/remove
         try {
-          final originalLength = medicine.takenHistory.length;
+          // final originalLength = medicine.takenHistory.length; // Removed unused
+
           final testDate = DateTime.now();
           medicine.takenHistory.add(testDate);
           medicine.takenHistory.remove(testDate);
