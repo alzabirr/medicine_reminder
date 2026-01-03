@@ -16,11 +16,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const TrashScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,14 +43,14 @@ class _MainScreenState extends State<MainScreen> {
               navigationBarTheme: NavigationBarThemeData(
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.4),
                 indicatorColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                labelTextStyle: MaterialStateProperty.resolveWith((states) {
-                  if (states.contains(MaterialState.selected)) {
+                labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
                     return TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w700, fontSize: 12);
                   }
                   return TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6), fontWeight: FontWeight.w500, fontSize: 12);
                 }),
-                iconTheme: MaterialStateProperty.resolveWith((states) {
-                  if (states.contains(MaterialState.selected)) {
+                iconTheme: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
                     return IconThemeData(color: Theme.of(context).primaryColor, size: 26);
                   }
                   return IconThemeData(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6), size: 24);

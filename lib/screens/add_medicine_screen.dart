@@ -732,10 +732,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.8),
-          fontWeight: FontWeight.w800,
-          fontSize: 11,
-          letterSpacing: 1.2,
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w900,
+          fontSize: 13,
+          letterSpacing: 1.0,
         ),
       ),
     );

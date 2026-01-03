@@ -110,10 +110,10 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
         indicatorColor: primaryColor.withValues(alpha: 0.1),
-        labelTextStyle: MaterialStateProperty.all(
+        labelTextStyle: WidgetStateProperty.all(
           GoogleFonts.outfit(color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
         ),
-        iconTheme: MaterialStateProperty.all(const IconThemeData(color: textSecondary)),
+        iconTheme: WidgetStateProperty.all(const IconThemeData(color: textSecondary)),
       ),
     );
   }

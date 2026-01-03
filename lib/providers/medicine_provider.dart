@@ -164,7 +164,16 @@ class MedicineProvider extends ChangeNotifier {
       // represent that in a single NotificationCalendar if it doesn't align with weekly/monthly.
     }
     
-    // Medicine is valid, proceed with scheduling
+    // If it's a future start date, we should only schedule TODAY if today is >= start.
+    // However, if we schedule a generic daily repeating one, it might ring too early.
+    // For now, let's skip scheduling if today is before start, 
+    // AND provide a mechanism to re-schedule when the app opens or dates change.
+    
+    if (today.isBefore(start)) {
+      debugPrint('Medicine ${medicine.name} starts in the future (${start.year}-${start.month}-${start.day}). Skipping scheduling for now.');
+      return;
+    }
+
     for (final slotString in medicine.timeSlots) {
       try {
         final pivotIndex = slotString.indexOf(':');
@@ -190,22 +199,53 @@ class MedicineProvider extends ChangeNotifier {
            hour = h;
            minute = m;
         } else {
-             debugPrint('Could not parse time string: $timeStr');
              continue; 
         }
         
         final notificationId = (medicine.id + label).hashCode;
 
-        await _notificationService.scheduleNotification(
-          id: notificationId,
-          title: 'Medi Reminder',
-          body: 'Time for ${medicine.name}${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}. Stay healthy! ',
-          hour: hour,
-          minute: minute,
-          startDate: scheduleFromDate, // Pass the calculated start date
-        );
-        
-        debugPrint('Scheduled notification for ${medicine.name} at $hour:$minute from ${scheduleFromDate.year}-${scheduleFromDate.month}-${scheduleFromDate.day}');
+        if (medicine.interval == 1) {
+          // Daily
+          await _notificationService.scheduleNotification(
+            id: notificationId,
+            title: 'Daily: ${medicine.name}',
+            body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+            hour: hour,
+            minute: minute,
+            repeats: true,
+          );
+        } else if (medicine.interval == 7) {
+          // Weekly
+          await _notificationService.scheduleNotification(
+            id: notificationId,
+            title: 'Weekly: ${medicine.name}',
+            body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+            hour: hour,
+            minute: minute,
+            weekday: start.weekday,
+            repeats: true,
+          );
+        } else {
+          // Every X days - schedule next 10 occurrences manually as AwesomeNotifications 
+          // doesn't support "Every X days" repetition natively in NotificationCalendar.
+          for (int i = 0; i < 10; i++) {
+            final occurrenceDate = start.add(Duration(days: i * medicine.interval));
+            if (occurrenceDate.isBefore(today)) continue;
+            
+            // Limit to roughly a month out
+            if (occurrenceDate.difference(today).inDays > 60) break;
+
+            await _notificationService.scheduleNotification(
+              id: (medicine.id + label + i.toString()).hashCode,
+              title: 'Medi: ${medicine.name}',
+              body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+              hour: hour,
+              minute: minute,
+              day: occurrenceDate,
+              repeats: false, // Single day notification
+            );
+          }
+        }
         
       } catch (e) {
         debugPrint('Error scheduling notification: $e');

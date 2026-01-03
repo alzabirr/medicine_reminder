@@ -84,43 +84,38 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
-    DateTime? startDate, // Optional: when to start the recurring notification
+    int? weekday, // 1-7 (Mon-Sun)
+    DateTime? day, // Specific day
+    bool repeats = true,
   }) async {
-    
-    // If startDate is provided, schedule from that date
-    // Otherwise, schedule from today (default behavior)
-    final scheduleDate = startDate ?? DateTime.now();
     
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: id,
-        channelKey: 'basic_channel', // Must match main.dart
+        channelKey: 'basic_channel',
         title: title,
         body: body,
-        notificationLayout: NotificationLayout.Default, // or BigText
-        category: NotificationCategory.Alarm, // To ensure it rings loud
+        notificationLayout: NotificationLayout.Default,
+        category: NotificationCategory.Alarm,
         wakeUpScreen: true,
         fullScreenIntent: true,
         autoDismissible: false,
         backgroundColor: Colors.deepPurple,
       ),
       schedule: NotificationCalendar(
-        // year, month, day removed to allow daily repetition
+        weekday: weekday,
+        day: day?.day,
+        month: day?.month,
+        year: day?.year,
         hour: hour,
         minute: minute,
         second: 0,
         millisecond: 0,
-        repeats: true, 
+        repeats: repeats, 
         allowWhileIdle: true,
         preciseAlarm: true,
       ),
     );
-    
-    if (startDate != null) {
-      debugPrint("Scheduled notification $id starting from ${scheduleDate.year}-${scheduleDate.month}-${scheduleDate.day} at $hour:$minute");
-    } else {
-      debugPrint("Scheduled notification $id for $hour:$minute");
-    }
   }
 
   Future<void> cancelNotification(int id) async {
