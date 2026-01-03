@@ -184,11 +184,18 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
   }
 
+  bool _showValidationErrors = false;
+
   void _saveMedicine() {
+    setState(() => _showValidationErrors = true);
+    
     if (_formKey.currentState!.validate()) {
       if (_selectedTimeSlots.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select at least one time (Morning/Noon/Night)')),
+          const SnackBar(
+            content: Text('Please select at least one time slot (Morning/Noon/Night)'),
+            backgroundColor: AppTheme.errorColor,
+          ),
         );
         return;
       }
@@ -477,7 +484,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               const SizedBox(height: 12),
               
               // Optimized Animated Input Field
-              _MedicineNameInput(controller: _nameController),
+              _MedicineNameInput(
+                controller: _nameController,
+                showError: _showValidationErrors,
+              ),
               
               const SizedBox(height: 20),
 
@@ -626,14 +636,29 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               // Frequency
               _buildSectionLabel('Reminder Frequency'),
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildFrequencyChip('Morning'),
-                  _buildFrequencyChip('Noon'),
-                  _buildFrequencyChip('Night'),
-                ],
+              Container(
+                padding: (_showValidationErrors && _selectedTimeSlots.isEmpty) ? const EdgeInsets.all(8) : EdgeInsets.zero,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: (_showValidationErrors && _selectedTimeSlots.isEmpty) 
+                        ? AppTheme.errorColor.withValues(alpha: 0.5) 
+                        : Colors.transparent,
+                    width: 2,
+                  ),
+                  color: (_showValidationErrors && _selectedTimeSlots.isEmpty)
+                      ? AppTheme.errorColor.withValues(alpha: 0.05)
+                      : Colors.transparent,
+                ),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildFrequencyChip('Morning'),
+                    _buildFrequencyChip('Noon'),
+                    _buildFrequencyChip('Night'),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -720,14 +745,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 // Optimized widget to handle hint animation without re-rendering entire screen
 class _MedicineNameInput extends StatefulWidget {
   final TextEditingController controller;
-  const _MedicineNameInput({required this.controller});
+  final bool showError;
+  const _MedicineNameInput({required this.controller, this.showError = false});
 
   @override
   State<_MedicineNameInput> createState() => _MedicineNameInputState();
 }
 
 class _MedicineNameInputState extends State<_MedicineNameInput> {
-  // Hint Animation variables
+  // ... (keeping existing logic)
   String _displayHintText = '';
   final String _fullHintText = 'Type your medicine name...';
   Timer? _hintTimer;
@@ -737,7 +763,6 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
   @override
   void initState() {
     super.initState();
-    // Start animation only if text is empty
     if (widget.controller.text.isEmpty) {
       _startHintAnimation();
     }
@@ -746,7 +771,6 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
 
   void _onTextChanged() {
     if (widget.controller.text.isNotEmpty) {
-       // Stop animation if user types
        _stopAnimation();
     }
   }
@@ -755,16 +779,13 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
     _hintTimer?.cancel();
     if (mounted) {
        setState(() {
-         // Reset to full text so it looks normal if they delete text later
          _displayHintText = _fullHintText; 
        });
     }
   }
 
   void _startHintAnimation() {
-    // Prevent multiple timers
     _hintTimer?.cancel();
-    
     _hintTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       if (_hintCharIndex < _fullHintText.length) {
         if (mounted) {
@@ -774,10 +795,8 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
           });
         }
       } else {
-        // Animation finished one cycle
         timer.cancel();
         _animationCompleted = true;
-        // Don't restart loop, just leave it full. CONSTANT REBUILDING CAUSES LAG.
       }
     });
   }
@@ -791,13 +810,21 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
 
   @override
   Widget build(BuildContext context) {
+    final hasError = widget.showError && widget.controller.text.isEmpty;
+    
     return RepaintBoundary(
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.getNeumorphicShadowInset(context),
+          border: Border.all(
+            color: hasError ? AppTheme.errorColor.withValues(alpha: 0.5) : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: hasError 
+            ? [BoxShadow(color: AppTheme.errorColor.withValues(alpha: 0.1), blurRadius: 8, spreadRadius: 1)]
+            : AppTheme.getNeumorphicShadowInset(context),
         ),
         child: TextFormField(
           controller: widget.controller,
@@ -805,17 +832,22 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
             hintText: _displayHintText,
             prefixIcon: Padding(
               padding: const EdgeInsets.only(left: 16, right: 10),
-              child: Icon(Icons.medication, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 20),
+              child: Icon(
+                Icons.medication, 
+                color: hasError ? AppTheme.errorColor : AppTheme.textSecondary.withValues(alpha: 0.5), 
+                size: 20,
+              ),
             ),
             prefixIconConstraints: const BoxConstraints(minWidth: 40),
             filled: false,
             isDense: true,
             border: InputBorder.none,
+            errorStyle: const TextStyle(height: 0, fontSize: 0), // Hide default error text
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
             hintStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.4)),
           ),
           style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
-          validator: (value) => (value == null || value.isEmpty) ? 'Please enter name' : null,
+          validator: (value) => (value == null || value.isEmpty) ? '' : null,
         ),
       ),
     );

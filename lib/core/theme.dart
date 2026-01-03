@@ -99,6 +99,14 @@ class AppTheme {
         prefixIconColor: textSecondary,
       ),
 
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: textPrimary,
+        contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+        actionTextColor: primaryColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        behavior: SnackBarBehavior.floating,
+      ),
+
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
         indicatorColor: primaryColor.withValues(alpha: 0.1),

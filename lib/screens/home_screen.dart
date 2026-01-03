@@ -357,7 +357,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             onDismissed: (direction) {
                               provider.deleteMedicine(medicine.id);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('${medicine.name} deleted')),
+                                SnackBar(
+                                  content: Text('${medicine.name} deleted'),
+                                  duration: const Duration(seconds: 1),
+                                ),
                               );
                             },
                             

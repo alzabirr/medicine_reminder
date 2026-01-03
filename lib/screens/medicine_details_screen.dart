@@ -335,6 +335,7 @@ class MedicineDetailsScreen extends StatelessWidget {
                    content: Text('${med.name} moved to trash'),
                    behavior: SnackBarBehavior.floating,
                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                   duration: const Duration(seconds: 1),
                  ),
               );
             },
