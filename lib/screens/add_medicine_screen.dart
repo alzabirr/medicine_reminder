@@ -41,10 +41,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     if (widget.medicine != null) {
       final m = widget.medicine!;
       _nameController.text = m.name;
-      _selectedType = m.type; // Ensure value exists in _types or handle custom
+      _selectedType = m.type; 
       if (!_types.contains(m.type)) {
          if (_types.isNotEmpty) _selectedType = _types.first; 
-         // ideally adds it or handles it, but robust enough for now
       }
       _selectedInstruction = m.instruction ?? 'After Meal';
       _startDate = DateTime(m.startTime.year, m.startTime.month, m.startTime.day);
@@ -80,10 +79,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             final label = slot.substring(0, pivot).trim();
             final timeStr = slot.substring(pivot + 1).trim();
             
-            // Parse timeStr to TimeOfDay
-            // We can try strict format or our robust logic.
-            // Since TimeOfDay is just hour/minute, let's use the robust logic 
-            // from provider but simpler here for TimeOfDay
             try {
                final timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
                final match = timeRegex.firstMatch(timeStr);
@@ -144,7 +139,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         _customEndDate = picked;
       });
     } else {
-       // Revert if cancelled and invalid
        if (_customEndDate == null) {
           setState(() {
              _selectedDuration = '1 Month';
@@ -207,7 +201,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       }).toList();
 
       if (widget.medicine != null) {
-        // Edit Mode
          Provider.of<MedicineProvider>(context, listen: false).updateMedicine(
             widget.medicine!,
             name: _nameController.text,
@@ -223,7 +216,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             const SnackBar(content: Text('Medicine Updated Successfully! 💊')),
          );
       } else {
-        // Add Mode
         final medicine = Medicine(
           id: const Uuid().v4(),
           name: _nameController.text,
@@ -249,7 +241,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
   IconData _getIconForType(String type) {
     switch (type.toLowerCase()) {
-      case 'pills':
       case 'pill':
       case 'tablet':
         return Icons.medication;
@@ -269,7 +260,77 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
   }
 
-  Widget _buildFrequencyChip(String label) {
+  Widget _buildTypeSelector() {
+    return SizedBox(
+      height: 110, // Increased slightly to match new Frequency height
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        itemCount: _types.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final type = _types[index];
+          final isSelected = _selectedType == type;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedType = type),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 72,
+              decoration: BoxDecoration(
+                color: isSelected ? Theme.of(context).primaryColor : AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: isSelected 
+                    ? [] // Remove shadow when selected
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                        const BoxShadow(
+                          color: Colors.white,
+                          blurRadius: 8,
+                          offset: Offset(-2, -2),
+                        ),
+                      ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   AnimatedContainer(
+                     duration: const Duration(milliseconds: 300),
+                     padding: const EdgeInsets.all(10),
+                     decoration: BoxDecoration(
+                       color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
+                       shape: BoxShape.circle,
+                     ),
+                     child: Icon(
+                      _getIconForType(type),
+                      size: 24,
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    ),
+                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    type,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFrequencyChip(String label, IconData icon, List<Color> gradientColors) {
     final isSelected = _selectedTimeSlots.containsKey(label);
     final selectedTime = _selectedTimeSlots[label];
 
@@ -307,59 +368,125 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           }
         }
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: 112, // Increased fixed height to prevent overflow
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10), // Reduced vertical padding
         decoration: BoxDecoration(
-          color: AppTheme.surfaceColor,
+          gradient: isSelected 
+             ? LinearGradient(
+                 colors: gradientColors,
+                 begin: Alignment.topLeft,
+                 end: Alignment.bottomRight,
+               )
+             : LinearGradient(
+                 colors: [AppTheme.surfaceColor, AppTheme.surfaceColor],
+               ),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
+          border: Border.all(
+            color: isSelected ? Colors.transparent : Colors.grey.withValues(alpha: 0.1),
+            width: 1,
+          ),
+          boxShadow: isSelected 
+              ? [] // Remove shadow when selected
+              : AppTheme.neumorphicShadow,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (isSelected)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Icon(Icons.check_circle, size: 16, color: AppTheme.successColor),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
+                shape: BoxShape.circle,
               ),
+              child: Icon(
+                icon, 
+                color: isSelected ? Colors.white : gradientColors.first.withValues(alpha: 0.7), 
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 6), // Reduced spacing
             Text(
-              isSelected && selectedTime != null 
-                  ? '$label (${selectedTime.format(context)})' 
-                  : label,
+              label,
               style: TextStyle(
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withValues(alpha: 0.5),
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : AppTheme.textPrimary,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
                 fontSize: 13,
               ),
             ),
+            if (isSelected && selectedTime != null) ...[
+              const SizedBox(height: 4), // Reduced spacing
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  selectedTime.format(context),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ]
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInstructionChip(String label) {
+  Widget _buildInstructionChip(String label, IconData icon) {
     final isSelected = _selectedInstruction == label;
+    final primaryColor = Theme.of(context).primaryColor;
+    
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedInstruction = label;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      onTap: () => setState(() => _selectedInstruction = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: 60, // Match Start Date height
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceColor,
+          color: isSelected ? primaryColor : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected ? AppTheme.neumorphicShadowInset : AppTheme.neumorphicShadow,
+          boxShadow: isSelected 
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ] 
+              : AppTheme.neumorphicShadow,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? AppTheme.textPrimary : AppTheme.textPrimary.withValues(alpha: 0.5),
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            fontSize: 13,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.2) : primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : primaryColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -412,7 +539,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 140), // More padding to see content behind the bar
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
         child: Form(
           key: _formKey,
           child: Column(
@@ -423,8 +550,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 child: GestureDetector(
                   onTap: _pickImage,
                   child: Container(
-                    width: 150,
-                    height: 150,
+                    width: 120,
+                    height: 120,
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       shape: BoxShape.circle,
@@ -434,8 +561,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 130,
-                          height: 130,
+                          width: 105,
+                          height: 105,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -443,8 +570,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           ),
                         ),
                         Container(
-                          width: 115,
-                          height: 115,
+                          width: 95,
+                          height: 95,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -454,14 +581,13 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               ? Image.file(_image!, fit: BoxFit.cover)
                               : Icon(
                                   _getIconForType(_selectedType),
-                                  size: 48,
+                                  size: 40,
                                   color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
                                 ),
                         ),
-                        // Small Camera Action Overlay
                         Positioned(
                           bottom: 0,
-                          right: 10,
+                          right: 6,
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -469,7 +595,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               shape: BoxShape.circle,
                               boxShadow: AppTheme.neumorphicShadow,
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
                           ),
                         ),
                       ],
@@ -477,55 +603,22 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // Title Section - Name
               _buildSectionLabel('Medicine Name'),
               const SizedBox(height: 12),
-              
-              // Optimized Animated Input Field
               _MedicineNameInput(
                 controller: _nameController,
                 showError: _showValidationErrors,
               ),
-              
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // Type Selector
-              _buildSectionLabel('Types of Medicine'),
+              // Horizontal Type Selector
+              _buildSectionLabel('Medicine Type'),
               const SizedBox(height: 12),
-              Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.getNeumorphicShadowInset(context),
-                ),
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: _selectedType,
-                  icon: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Icon(Icons.expand_more_rounded, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
-                  ),
-                  decoration: InputDecoration(
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(Icons.category_rounded, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 20),
-                    ),
-                    prefixIconConstraints: const BoxConstraints(minWidth: 40),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
-                  dropdownColor: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  items: _types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                  onChanged: (val) => setState(() => _selectedType = val!),
-                ),
-              ),
-              const SizedBox(height: 20),
+              _buildTypeSelector(),
+              const SizedBox(height: 24),
 
               // Calendar & Duration
               Row(
@@ -540,20 +633,27 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           onTap: () => _selectDate(context),
                           child: Container(
                             height: 60,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceColor,
                               borderRadius: BorderRadius.circular(20),
-                              boxShadow: AppTheme.neumorphicShadowInset,
+                              boxShadow: AppTheme.neumorphicShadow,
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.calendar_month, color: AppTheme.textSecondary.withValues(alpha: 0.5), size: 18),
-                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 20),
+                                ),
+                                const SizedBox(width: 12),
                                 Flexible(
                                   child: Text(
-                                    "${_startDate.day}/${_startDate.month}/${_startDate.year}",
-                                    style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+                                    "${_startDate.day}/${_startDate.month}",
+                                    style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -564,7 +664,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,29 +673,29 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                         const SizedBox(height: 12),
                         Container(
                           height: 60,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: AppTheme.getNeumorphicShadowInset(context),
+                            boxShadow: AppTheme.neumorphicShadow,
                           ),
                           child: DropdownButtonFormField<String>(
                             value: _selectedDuration,
-                            icon: Icon(Icons.expand_more_rounded, color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5)),
+                            icon: Icon(Icons.keyboard_arrow_down_rounded, color: Theme.of(context).primaryColor),
                             decoration: const InputDecoration(
                               border: InputBorder.none, 
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 18), // Centers text in 60h container
+                              contentPadding: EdgeInsets.symmetric(vertical: 18),
                             ),
-                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 15, fontWeight: FontWeight.w600),
+                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 13, fontWeight: FontWeight.bold),
                             dropdownColor: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(20),
                             selectedItemBuilder: (ctx) => _durations.map((item) {
-                              if (item == 'Pick Date' && _customEndDate != null) {
-                                final days = _customEndDate!.difference(_startDate).inDays + 1;
-                                return Text("$days ${days == 1 ? 'Day' : 'Days'}");
-                              }
-                              return Text(item);
+                               if (item == 'Pick Date' && _customEndDate != null) {
+                                 final days = _customEndDate!.difference(_startDate).inDays + 1;
+                                 return Text("$days Days");
+                               }
+                               return Text(item);
                             }).toList(),
                             items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                             onChanged: (val) {
@@ -616,62 +716,68 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.textSecondary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'ENDS: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
-                    style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700, fontSize: 10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Frequency
-              _buildSectionLabel('Reminder Frequency'),
-              const SizedBox(height: 14),
-              Container(
-                padding: (_showValidationErrors && _selectedTimeSlots.isEmpty) ? const EdgeInsets.all(8) : EdgeInsets.zero,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: (_showValidationErrors && _selectedTimeSlots.isEmpty) 
-                        ? AppTheme.errorColor.withValues(alpha: 0.5) 
-                        : Colors.transparent,
-                    width: 2,
-                  ),
-                  color: (_showValidationErrors && _selectedTimeSlots.isEmpty)
-                      ? AppTheme.errorColor.withValues(alpha: 0.05)
-                      : Colors.transparent,
-                ),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _buildFrequencyChip('Morning'),
-                    _buildFrequencyChip('Noon'),
-                    _buildFrequencyChip('Night'),
-                  ],
+                child: Text(
+                  'Ends: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
+                  style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500, fontSize: 11),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Instruction
-              _buildSectionLabel('Special Instructions'),
+              // Frequency
+              _buildSectionLabel('Reminder Frequency'),
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildInstructionChip('Before Meal'),
-                  _buildInstructionChip('After Meal'),
-                  _buildInstructionChip('Any Time'),
+                   Expanded(
+                     child: _buildFrequencyChip(
+                       'Morning', 
+                       Icons.wb_sunny_rounded, 
+                       [const Color(0xFFFF9800), const Color(0xFFFFC107)] // Bold Sunrise
+                     )
+                   ),
+                   const SizedBox(width: 12),
+                   Expanded(
+                     child: _buildFrequencyChip(
+                       'Noon', 
+                       Icons.wb_cloudy_rounded, 
+                       [const Color(0xFF2196F3), const Color(0xFF03A9F4)] // Bold Day
+                     )
+                   ),
+                   const SizedBox(width: 12),
+                   Expanded(
+                     child: _buildFrequencyChip(
+                       'Night', 
+                       Icons.nights_stay_rounded, 
+                       [const Color(0xFF3F51B5), const Color(0xFF673AB7)] // Bold Evening
+                     )
+                   ),
+                ],
+              ),
+              
+              if (_showValidationErrors && _selectedTimeSlots.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 4),
+                  child: Text('Please select at least one time', style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+                ),
+
+              const SizedBox(height: 24),
+
+              // Instruction
+              _buildSectionLabel('When to take?'),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInstructionChip('Before Meal', Icons.restaurant),
+                  ),
+                  const SizedBox(width: 16), // Match Date picker gap
+                  Expanded(
+                    child: _buildInstructionChip('After Meal', Icons.dinner_dining),
+                  ),
                 ],
               ),
             ],
@@ -679,43 +785,31 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ),
       ),
       bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 8),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceColor.withValues(alpha: 0.95), // Solid, slightly transparent background
-          border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.4), width: 0.5),
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.8)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              offset: const Offset(0, -2),
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: GestureDetector(
-          onTap: _saveMedicine,
-          child: Container(
-            height: 55, // Slightly slimmer button
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.9),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _saveMedicine,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                widget.medicine != null ? 'Update Reminder' : 'Save Reminder',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 17,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+              child: const Center(
+                child: Text(
+                  'Save Medicine',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -730,12 +824,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
-        label.toUpperCase(),
+        label,
         style: TextStyle(
           color: AppTheme.textPrimary,
-          fontWeight: FontWeight.w900,
-          fontSize: 13,
-          letterSpacing: 1.0,
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
         ),
       ),
     );

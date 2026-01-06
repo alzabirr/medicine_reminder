@@ -253,13 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedDecoration: BoxDecoration(
                         color: Theme.of(context).primaryColor,
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        // Shadow removed as requested
                       ),
                       selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       markerDecoration: BoxDecoration(
