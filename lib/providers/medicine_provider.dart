@@ -226,14 +226,33 @@ class MedicineProvider extends ChangeNotifier {
             repeats: true,
           );
         } else {
-          // Every X days - schedule next 10 occurrences manually as AwesomeNotifications 
-          // doesn't support "Every X days" repetition natively in NotificationCalendar.
+          // Every X days - schedule next 10 occurrences manually
+          // Calculate the first valid occurrence on or after today
+          final daysSinceStart = today.difference(start).inDays;
+          int daysUntilNext = 0;
+          
+          if (daysSinceStart >= 0) {
+            final remainder = daysSinceStart % medicine.interval;
+            if (remainder != 0) {
+              daysUntilNext = medicine.interval - remainder;
+            }
+          } else {
+            // Should not happen due to check above, but for safety:
+            daysUntilNext = start.difference(today).inDays;
+          }
+
+          final firstOccurrence = today.add(Duration(days: daysUntilNext));
+
           for (int i = 0; i < 10; i++) {
-            final occurrenceDate = start.add(Duration(days: i * medicine.interval));
-            if (occurrenceDate.isBefore(today)) continue;
+            final occurrenceDate = firstOccurrence.add(Duration(days: i * medicine.interval));
             
             // Limit to roughly a month out
             if (occurrenceDate.difference(today).inDays > 60) break;
+
+            if (medicine.endDate != null) {
+               final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+               if (occurrenceDate.isAfter(end)) break;
+            }
 
             await _notificationService.scheduleNotification(
               id: (medicine.id + label + i.toString()).hashCode,

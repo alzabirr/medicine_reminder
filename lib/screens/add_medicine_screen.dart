@@ -753,102 +753,45 @@ class _MedicineNameInput extends StatefulWidget {
 }
 
 class _MedicineNameInputState extends State<_MedicineNameInput> {
-  // ... (keeping existing logic)
-  String _displayHintText = '';
-  final String _fullHintText = 'Type your medicine name...';
-  Timer? _hintTimer;
-  int _hintCharIndex = 0;
-  bool _animationCompleted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.controller.text.isEmpty) {
-      _startHintAnimation();
-    }
-    widget.controller.addListener(_onTextChanged);
-  }
-
-  void _onTextChanged() {
-    if (widget.controller.text.isNotEmpty) {
-       _stopAnimation();
-    }
-  }
-
-  void _stopAnimation() {
-    _hintTimer?.cancel();
-    if (mounted) {
-       setState(() {
-         _displayHintText = _fullHintText; 
-       });
-    }
-  }
-
-  void _startHintAnimation() {
-    _hintTimer?.cancel();
-    _hintTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
-      if (_hintCharIndex < _fullHintText.length) {
-        if (mounted) {
-          setState(() {
-            _displayHintText += _fullHintText[_hintCharIndex];
-            _hintCharIndex++;
-          });
-        }
-      } else {
-        timer.cancel();
-        _animationCompleted = true;
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _hintTimer?.cancel();
-    widget.controller.removeListener(_onTextChanged);
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final hasError = widget.showError && widget.controller.text.isEmpty;
     
-    return RepaintBoundary(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: hasError ? AppTheme.errorColor.withValues(alpha: 0.5) : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: hasError 
-            ? [BoxShadow(color: AppTheme.errorColor.withValues(alpha: 0.1), blurRadius: 8, spreadRadius: 1)]
-            : AppTheme.getNeumorphicShadowInset(context),
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasError ? AppTheme.errorColor.withValues(alpha: 0.5) : Colors.transparent,
+          width: 2,
         ),
-        child: TextFormField(
-          controller: widget.controller,
-          decoration: InputDecoration(
-            hintText: _displayHintText,
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 10),
-              child: Icon(
-                Icons.medication, 
-                color: hasError ? AppTheme.errorColor : AppTheme.textSecondary.withValues(alpha: 0.5), 
-                size: 20,
-              ),
+        boxShadow: hasError 
+          ? [BoxShadow(color: AppTheme.errorColor.withValues(alpha: 0.1), blurRadius: 8, spreadRadius: 1)]
+          : AppTheme.getNeumorphicShadowInset(context),
+      ),
+      child: TextFormField(
+        controller: widget.controller,
+        decoration: InputDecoration(
+          hintText: 'Type your medicine name...',
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 10),
+            child: Icon(
+              Icons.medication, 
+              color: hasError ? AppTheme.errorColor : AppTheme.textSecondary.withValues(alpha: 0.5), 
+              size: 20,
             ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 40),
-            filled: false,
-            isDense: true,
-            border: InputBorder.none,
-            errorStyle: const TextStyle(height: 0, fontSize: 0), // Hide default error text
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
-            hintStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.4)),
           ),
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
-          validator: (value) => (value == null || value.isEmpty) ? '' : null,
+          prefixIconConstraints: const BoxConstraints(minWidth: 40),
+          filled: false,
+          isDense: true,
+          border: InputBorder.none,
+          errorStyle: const TextStyle(height: 0, fontSize: 0), // Hide default error text
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          hintStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.4)),
         ),
+        style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
+        validator: (value) => (value == null || value.isEmpty) ? '' : null,
       ),
     );
   }

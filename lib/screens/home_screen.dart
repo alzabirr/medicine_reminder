@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui' as dart_ui; // Added for ImageFilter
 import 'package:medi/models/medicine.dart'; // Added
 import 'package:medi/providers/medicine_provider.dart';
-import 'package:medi/screens/add_medicine_screen.dart';
 import 'package:medi/screens/medicine_details_screen.dart'; // Added
 import 'package:medi/widgets/medicine_card.dart';
 import 'package:medi/widgets/neumorphic_container.dart';
-import 'package:medi/core/transitions.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart'; // Added
