@@ -66,93 +66,97 @@ class TrashScreen extends StatelessWidget {
           builder: (context, provider, child) {
             final deletedMedicines = provider.deletedMedicines;
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return Stack(
               children: [
-                // Premium Header (Matches HomeScreen)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Trash History',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).textTheme.titleLarge?.color,
-                          letterSpacing: -0.5,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Premium Header (Matches HomeScreen)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Trash History',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900, // Thicker
+                              color: Theme.of(context).textTheme.titleLarge?.color,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4), 
+                        ],
                       ),
-                      const SizedBox(height: 4), 
-                    ],
-                  ),
-                ),
+                    ),
 
-                Expanded(
-                  child: deletedMedicines.isEmpty
-                      ? _buildEmptyState(context)
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(top: 8, bottom: 120),
-                          itemCount: deletedMedicines.length,
-                          physics: const BouncingScrollPhysics(),
-                          itemBuilder: (context, index) {
-                            final medicine = deletedMedicines[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: Dismissible(
-                                  key: Key(medicine.id),
-                                  direction: DismissDirection.horizontal,
-                                  
-                                  // Swipe Right -> Restore (Green-ish Glass)
-                                  background: Container(
-                                    alignment: Alignment.centerLeft,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                                    color: AppTheme.successColor.withValues(alpha: 0.15),
-                                    child: Icon(Icons.restore_from_trash_rounded, color: AppTheme.successColor, size: 28),
-                                  ),
-                                  
-                                  // Swipe Left -> Delete Forever (Red-ish Glass)
-                                  secondaryBackground: Container(
-                                    alignment: Alignment.centerRight,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
-                                    child: Icon(Icons.delete_forever_rounded, color: Theme.of(context).colorScheme.error, size: 28),
-                                  ),
+                    Expanded(
+                      child: deletedMedicines.isEmpty
+                          ? _buildEmptyState(context)
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(top: 8, bottom: 120),
+                              itemCount: deletedMedicines.length,
+                              physics: const BouncingScrollPhysics(),
+                              itemBuilder: (context, index) {
+                                final medicine = deletedMedicines[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: Dismissible(
+                                      key: Key(medicine.id),
+                                      direction: DismissDirection.horizontal,
+                                      
+                                      // Swipe Right -> Restore (Green-ish Glass)
+                                      background: Container(
+                                        alignment: Alignment.centerLeft,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                        color: AppTheme.successColor.withValues(alpha: 0.15),
+                                        child: Icon(Icons.restore_from_trash_rounded, color: AppTheme.successColor, size: 28),
+                                      ),
+                                      
+                                      // Swipe Left -> Delete Forever (Red-ish Glass)
+                                      secondaryBackground: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
+                                        child: Icon(Icons.delete_forever_rounded, color: Theme.of(context).colorScheme.error, size: 28),
+                                      ),
 
-                                  confirmDismiss: (direction) async {
-                                    if (direction == DismissDirection.startToEnd) {
-                                      await provider.restoreMedicine(medicine);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('${medicine.name} restored'),
-                                            behavior: SnackBarBehavior.floating,
-                                            backgroundColor: AppTheme.successColor,
-                                          ),
-                                        );
-                                      }
-                                      return false;
-                                    } else {
-                                      _showDeleteConfirmation(context, provider, medicine.id, medicine.name);
-                                      return false;
-                                    }
-                                  },
-                                  
-                                  child: Opacity(
-                                    opacity: 0.6,
-                                    child: MedicineCard(
-                                      medicine: medicine,
-                                      onCardTap: null,
+                                      confirmDismiss: (direction) async {
+                                        if (direction == DismissDirection.startToEnd) {
+                                          await provider.restoreMedicine(medicine);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('${medicine.name} restored'),
+                                                behavior: SnackBarBehavior.floating,
+                                                backgroundColor: AppTheme.successColor,
+                                              ),
+                                            );
+                                          }
+                                          return false;
+                                        } else {
+                                          _showDeleteConfirmation(context, provider, medicine.id, medicine.name);
+                                          return false;
+                                        }
+                                      },
+                                      
+                                      child: Opacity(
+                                        opacity: 0.6,
+                                        child: MedicineCard(
+                                          medicine: medicine,
+                                          onCardTap: null,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
               ],
             );

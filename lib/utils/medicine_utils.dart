@@ -203,4 +203,43 @@ class MedicineUtils {
     final diffDays = checkDay.difference(start).inDays;
     return diffDays % medicine.interval == 0;
   }
+
+  /// Builds the appropriate icon for a medicine type using standard Material Icons.
+  static Widget buildTypeIcon(BuildContext context, String type, {double size = 24, Color? color}) {
+    final typeLower = type.toLowerCase();
+    
+    IconData iconData;
+    switch (typeLower) {
+      case 'pill':
+        iconData = Icons.circle;
+        break;
+      case 'tablet':
+        iconData = Icons.medication;
+        break;
+      case 'liquid':
+      case 'syrup':
+        iconData = Icons.local_drink;
+        break;
+      case 'injection':
+        iconData = Icons.vaccines;
+        break;
+      case 'drop':
+        iconData = Icons.water_drop;
+        break;
+      case 'topical':
+        iconData = Icons.healing;
+        break;
+      case 'inhaler':
+        iconData = Icons.air_rounded;
+        break;
+      default:
+        iconData = Icons.medication_liquid;
+    }
+
+    return Icon(
+      iconData, 
+      size: size, 
+      color: color ?? Theme.of(context).primaryColor,
+    );
+  }
 }

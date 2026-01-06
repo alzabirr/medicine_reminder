@@ -133,10 +133,11 @@ class _MedicineCardState extends State<MedicineCard> {
                           clipBehavior: Clip.antiAlias,
                           child: widget.medicine.imagePath != null
                               ? Image.file(File(widget.medicine.imagePath!), fit: BoxFit.cover)
-                              : Icon(
-                                  _getIconForType(widget.medicine.type),
-                                  color: Theme.of(context).primaryColor,
+                              : MedicineUtils.buildTypeIcon(
+                                  context, 
+                                  widget.medicine.type, 
                                   size: 24,
+                                  color: Theme.of(context).primaryColor,
                                 ),
                         ),
                         if (isFullyFinished)
@@ -315,26 +316,5 @@ class _MedicineCardState extends State<MedicineCard> {
         ),
       ), 
     );
-  }
-
-  IconData _getIconForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'pill':
-      case 'tablet':
-        return Icons.medication;
-      case 'liquid':
-      case 'syrup':
-        return Icons.local_drink;
-      case 'injection':
-        return Icons.vaccines;
-      case 'drop':
-        return Icons.water_drop;
-      case 'topical':
-        return Icons.healing;
-      case 'inhaler':
-        return Icons.air_rounded;
-      default:
-        return Icons.medication_liquid;
-    }
   }
 }

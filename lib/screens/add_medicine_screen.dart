@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/providers/medicine_provider.dart';
+import 'package:medi/utils/medicine_utils.dart';
 import 'package:medi/core/theme.dart';
+import 'package:medi/widgets/floating_glass_action_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -239,36 +241,16 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
   }
 
-  IconData _getIconForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'pill':
-      case 'tablet':
-        return Icons.medication;
-      case 'liquid':
-      case 'syrup':
-        return Icons.local_drink;
-      case 'injection':
-        return Icons.vaccines;
-      case 'drop':
-        return Icons.water_drop;
-      case 'topical':
-        return Icons.healing;
-      case 'inhaler':
-        return Icons.air_rounded;
-      default:
-        return Icons.medication_liquid;
-    }
-  }
 
   Widget _buildTypeSelector() {
     return SizedBox(
-      height: 110, // Increased slightly to match new Frequency height
+      height: 95, // Reduced from 110
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         itemCount: _types.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final type = _types[index];
           final isSelected = _selectedType == type;
@@ -305,19 +287,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                        color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
                        shape: BoxShape.circle,
                      ),
-                     child: Icon(
-                      _getIconForType(type),
-                      size: 24,
-                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                     child: MedicineUtils.buildTypeIcon(
+                        context, 
+                        type, 
+                        size: 24, 
+                        color: isSelected ? Colors.white : AppTheme.textSecondary,
+                      ),
                     ),
-                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     type,
                     style: TextStyle(
                       color: isSelected ? Colors.white : AppTheme.textSecondary,
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -370,7 +353,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        height: 112, // Increased fixed height to prevent overflow
+        height: 95, // Reduced from 112
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10), // Reduced vertical padding
         decoration: BoxDecoration(
           gradient: isSelected 
@@ -395,7 +378,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6), // Reduced from 8
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
                 shape: BoxShape.circle,
@@ -403,20 +386,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               child: Icon(
                 icon, 
                 color: isSelected ? Colors.white : gradientColors.first.withValues(alpha: 0.7), 
-                size: 22,
+                size: 20, // Reduced from 22
               ),
             ),
-            const SizedBox(height: 6), // Reduced spacing
+            const SizedBox(height: 4), // Reduced from 6
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? Colors.white : AppTheme.textPrimary,
                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                fontSize: 13,
+                fontSize: 11, // Reduced from 13
               ),
             ),
             if (isSelected && selectedTime != null) ...[
-              const SizedBox(height: 4), // Reduced spacing
+              const SizedBox(height: 2), // Reduced from 4
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -523,6 +506,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -537,284 +521,289 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Premium Header Picker
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      shape: BoxShape.circle,
-                      boxShadow: AppTheme.getNeumorphicShadow(context),
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 105,
-                          height: 105,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Theme.of(context).cardColor,
-                            boxShadow: AppTheme.getNeumorphicShadowInset(context),
-                          ),
-                        ),
-                        Container(
-                          width: 95,
-                          height: 95,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Theme.of(context).cardColor,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: _image != null
-                              ? Image.file(_image!, fit: BoxFit.cover)
-                              : Icon(
-                                  _getIconForType(_selectedType),
-                                  size: 40,
-                                  color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
-                                ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 6,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
-                              shape: BoxShape.circle,
-                              boxShadow: AppTheme.neumorphicShadow,
-                            ),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Title Section - Name
-              _buildSectionLabel('Medicine Name'),
-              const SizedBox(height: 12),
-              _MedicineNameInput(
-                controller: _nameController,
-                showError: _showValidationErrors,
-              ),
-              const SizedBox(height: 24),
-
-              // Horizontal Type Selector
-              _buildSectionLabel('Medicine Type'),
-              const SizedBox(height: 12),
-              _buildTypeSelector(),
-              const SizedBox(height: 24),
-
-              // Calendar & Duration
-              Row(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionLabel('Start Date'),
-                        const SizedBox(height: 12),
-                        GestureDetector(
-                          onTap: () => _selectDate(context),
-                          child: Container(
-                            height: 60,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: AppTheme.neumorphicShadow,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Flexible(
-                                  child: Text(
-                                    "${_startDate.day}/${_startDate.month}",
-                                    style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                  // Premium Header Picker
+                  Center(
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          shape: BoxShape.circle,
+                          boxShadow: AppTheme.getNeumorphicShadow(context),
                         ),
-                      ],
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 105,
+                              height: 105,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(context).cardColor,
+                                boxShadow: AppTheme.getNeumorphicShadowInset(context),
+                              ),
+                            ),
+                            Container(
+                              width: 95,
+                              height: 95,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(context).cardColor,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: _selectedType.toLowerCase() == 'pill' && _image == null
+                                  ? MedicineUtils.buildTypeIcon(
+                                      context, 
+                                      'pill', 
+                                      size: 40,
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                                    )
+                                  : _image != null
+                                      ? Image.file(_image!, fit: BoxFit.cover)
+                                      : MedicineUtils.buildTypeIcon(
+                                          context, 
+                                          _selectedType, 
+                                          size: 40,
+                                          color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                                        ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 6,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).primaryColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: AppTheme.neumorphicShadow,
+                                ),
+                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionLabel('Duration'),
-                        const SizedBox(height: 12),
-                        Container(
-                          height: 60,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: AppTheme.neumorphicShadow,
-                          ),
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedDuration,
-                            icon: Icon(Icons.keyboard_arrow_down_rounded, color: Theme.of(context).primaryColor),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none, 
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 18),
+                  const SizedBox(height: 24),
+    
+                  // Title Section - Name
+                  _buildSectionLabel('Medicine Name'),
+                  const SizedBox(height: 12),
+                  _MedicineNameInput(
+                    controller: _nameController,
+                    showError: _showValidationErrors,
+                  ),
+                  const SizedBox(height: 24),
+    
+                  // Horizontal Type Selector
+                  _buildSectionLabel('Medicine Type'),
+                  const SizedBox(height: 12),
+                  _buildTypeSelector(),
+                  const SizedBox(height: 24),
+    
+                  // Calendar & Duration
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionLabel('Start Date'),
+                            const SizedBox(height: 12),
+                            GestureDetector(
+                              onTap: () => _selectDate(context),
+                              child: Container(
+                                height: 60,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: AppTheme.neumorphicShadow,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Flexible(
+                                      child: Text(
+                                        "${_startDate.day}/${_startDate.month}",
+                                        style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 13, fontWeight: FontWeight.bold),
-                            dropdownColor: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(20),
-                            selectedItemBuilder: (ctx) => _durations.map((item) {
-                               if (item == 'Pick Date' && _customEndDate != null) {
-                                 final days = _customEndDate!.difference(_startDate).inDays + 1;
-                                 return Text("$days Days");
-                               }
-                               return Text(item);
-                            }).toList(),
-                            items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                            onChanged: (val) {
-                              if (val == 'Pick Date') {
-                                setState(() => _selectedDuration = 'Pick Date');
-                                _selectCustomEndDate(context);
-                              } else {
-                                setState(() {
-                                  _selectedDuration = val!;
-                                  _customEndDate = null;
-                                });
-                              }
-                            },
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionLabel('Duration'),
+                            const SizedBox(height: 12),
+                            Container(
+                              height: 60,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: AppTheme.neumorphicShadow,
+                              ),
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _selectedDuration,
+                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: Theme.of(context).primaryColor),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none, 
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(vertical: 18),
+                                ),
+                                style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 13, fontWeight: FontWeight.bold),
+                                dropdownColor: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(20),
+                                selectedItemBuilder: (ctx) => _durations.map((item) {
+                                   if (item == 'Pick Date' && _customEndDate != null) {
+                                     final days = _customEndDate!.difference(_startDate).inDays + 1;
+                                     return Text("$days Days");
+                                   }
+                                   return Text(item);
+                                }).toList(),
+                                items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                                onChanged: (val) {
+                                  if (val == 'Pick Date') {
+                                    setState(() => _selectedDuration = 'Pick Date');
+                                    _selectCustomEndDate(context);
+                                  } else {
+                                    setState(() {
+                                      _selectedDuration = val!;
+                                      _customEndDate = null;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'Ends: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
+                      style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500, fontSize: 11),
                     ),
+                  ),
+                  const SizedBox(height: 24),
+    
+                  // Frequency
+                  _buildSectionLabel('Reminder Frequency'),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                       Expanded(
+                         child: _buildFrequencyChip(
+                           'Morning', 
+                           Icons.wb_sunny_rounded, 
+                           [const Color(0xFFFF9800), const Color(0xFFFFC107)] // Bold Sunrise
+                         )
+                       ),
+                       const SizedBox(width: 12),
+                       Expanded(
+                         child: _buildFrequencyChip(
+                           'Noon', 
+                           Icons.wb_cloudy_rounded, 
+                           [const Color(0xFF2196F3), const Color(0xFF03A9F4)] // Bold Day
+                         )
+                       ),
+                       const SizedBox(width: 12),
+                       Expanded(
+                         child: _buildFrequencyChip(
+                           'Night', 
+                           Icons.nights_stay_rounded, 
+                           [const Color(0xFF3F51B5), const Color(0xFF673AB7)] // Bold Evening
+                         )
+                       ),
+                    ],
+                  ),
+                  
+                  if (_showValidationErrors && _selectedTimeSlots.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 4),
+                      child: Text('Please select at least one time', style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+                    ),
+    
+                  const SizedBox(height: 24),
+    
+                  // Instruction
+                  _buildSectionLabel('When to take?'),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInstructionChip('Before Meal', Icons.restaurant),
+                      ),
+                      const SizedBox(width: 16), // Match Date picker gap
+                      Expanded(
+                        child: _buildInstructionChip('After Meal', Icons.dinner_dining),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'Ends: ${_calculatedEndDate.day}/${_calculatedEndDate.month}/${_calculatedEndDate.year}',
-                  style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500, fontSize: 11),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Frequency
-              _buildSectionLabel('Reminder Frequency'),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                   Expanded(
-                     child: _buildFrequencyChip(
-                       'Morning', 
-                       Icons.wb_sunny_rounded, 
-                       [const Color(0xFFFF9800), const Color(0xFFFFC107)] // Bold Sunrise
-                     )
-                   ),
-                   const SizedBox(width: 12),
-                   Expanded(
-                     child: _buildFrequencyChip(
-                       'Noon', 
-                       Icons.wb_cloudy_rounded, 
-                       [const Color(0xFF2196F3), const Color(0xFF03A9F4)] // Bold Day
-                     )
-                   ),
-                   const SizedBox(width: 12),
-                   Expanded(
-                     child: _buildFrequencyChip(
-                       'Night', 
-                       Icons.nights_stay_rounded, 
-                       [const Color(0xFF3F51B5), const Color(0xFF673AB7)] // Bold Evening
-                     )
-                   ),
-                ],
-              ),
-              
-              if (_showValidationErrors && _selectedTimeSlots.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, left: 4),
-                  child: Text('Please select at least one time', style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
-                ),
-
-              const SizedBox(height: 24),
-
-              // Instruction
-              _buildSectionLabel('When to take?'),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInstructionChip('Before Meal', Icons.restaurant),
-                  ),
-                  const SizedBox(width: 16), // Match Date picker gap
-                  Expanded(
-                    child: _buildInstructionChip('After Meal', Icons.dinner_dining),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Container(
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.8)],
             ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
+          FloatingGlassActionBar(
+            mainAction: GestureDetector(
               onTap: _saveMedicine,
-              borderRadius: BorderRadius.circular(20),
-              child: const Center(
-                child: Text(
-                  'Save Medicine',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        widget.medicine != null ? 'Update Medicine' : 'Set Reminder',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

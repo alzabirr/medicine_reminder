@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medi/core/theme.dart';
 import 'package:medi/screens/main_screen.dart';
 import 'package:provider/provider.dart';

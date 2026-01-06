@@ -54,4 +54,12 @@ class Medicine extends HiveObject {
     this.endDate,
     this.isDeleted = false,
   }) : takenHistory = takenHistory ?? [];
+
+  bool isTakenOn(DateTime date) {
+    return takenHistory.any((dt) => 
+      dt.year == date.year && 
+      dt.month == date.month && 
+      dt.day == date.day
+    );
+  }
 }

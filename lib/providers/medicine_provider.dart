@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
-import 'package:medi/services/notification_service.dart';
 
 class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
@@ -45,13 +44,7 @@ class MedicineProvider extends ChangeNotifier {
        final medicine = _medicines[medicineIndex];
        
        // 1. Cancel notifications
-       for (final slotString in medicine.timeSlots) {
-          final pivotIndex = slotString.indexOf(':');
-          final label = pivotIndex != -1 
-              ? slotString.substring(0, pivotIndex).trim() 
-              : slotString;
-          await _notificationService.cancelNotification((id + label).hashCode);
-       }
+       await _cancelNotifications(medicine);
        
        // 2. Soft delete
        medicine.isDeleted = true;
@@ -89,13 +82,7 @@ class MedicineProvider extends ChangeNotifier {
     int? frequency,
   }) async {
     // 1. Cancel old notifications using OLD slots
-    for (final slotString in medicine.timeSlots) {
-       final pivotIndex = slotString.indexOf(':');
-       final label = pivotIndex != -1 
-          ? slotString.substring(0, pivotIndex).trim() 
-          : slotString;
-       await _notificationService.cancelNotification((medicine.id + label).hashCode);
-    }
+    await _cancelNotifications(medicine);
 
     // 2. Update Medicine Object
     medicine.name = name;
@@ -115,6 +102,25 @@ class MedicineProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _cancelNotifications(Medicine medicine) async {
+    for (final slotString in medicine.timeSlots) {
+      final pivotIndex = slotString.indexOf(':');
+      final label = pivotIndex != -1 
+          ? slotString.substring(0, pivotIndex).trim() 
+          : slotString;
+      
+      final baseId = (medicine.id + label).hashCode;
+      
+      // Cancel standard daily/weekly
+      await _notificationService.cancelNotification(baseId);
+      
+      // Cancel potential manual occurrences (next 10) for interval-based
+      for (int i = 0; i < 10; i++) {
+        await _notificationService.cancelNotification((medicine.id + label + i.toString()).hashCode);
+      }
+    }
+  }
+
   Future<void> _scheduleNotifications(Medicine medicine) async {
     // Validate if medicine should be active
     final now = DateTime.now();
@@ -130,19 +136,7 @@ class MedicineProvider extends ChangeNotifier {
       }
     }
     
-    // 2. For future medicines, schedule from start date
-    // For current/past start dates, schedule from today
-    DateTime scheduleFromDate;
-    if (today.isBefore(start)) {
-      // Future medicine - schedule from start date
-      scheduleFromDate = start;
-      debugPrint('Medicine ${medicine.name} starts in the future. Scheduling from ${start.year}-${start.month}-${start.day}');
-    } else {
-      // Current or past start date - schedule from today
-      scheduleFromDate = today;
-    }
-    
-    // 3. Interval Logic (Smart filtering for scheduling)
+    // 2. Interval Logic (Smart filtering for scheduling)
     final diffDays = today.difference(start).inDays;
     
     bool shouldShowToday = false;
