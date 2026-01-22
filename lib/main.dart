@@ -4,6 +4,9 @@ import 'package:medi/core/theme.dart';
 import 'package:medi/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
+import 'package:medi/services/notification_service.dart';
+
+import 'package:medi/providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,8 +41,11 @@ void main() async {
   await medicineProvider.init();
   
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => medicineProvider,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => medicineProvider),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
       child: const MedicineReminderApp(),
     ),
   );
@@ -50,11 +56,19 @@ class MedicineReminderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return MaterialApp(
       debugShowCheckedModeBanner: false,
        
+      navigatorKey: NotificationService.navigatorKey,
       restorationScopeId: 'medi_app',
       theme: AppTheme.lightTheme,
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: AppTheme.primaryColor,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppTheme.primaryColor, brightness: Brightness.dark),
+      ),
+      themeMode: themeProvider.themeMode,
       home: const MainScreen(),
     );
   }

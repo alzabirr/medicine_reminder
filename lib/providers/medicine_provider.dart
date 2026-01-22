@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
@@ -7,6 +8,15 @@ class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final NotificationService _notificationService = NotificationService();
   NotificationService get notificationService => _notificationService;
+  
+  bool _notificationsEnabled = true;
+  bool get notificationsEnabled => _notificationsEnabled;
+
+  Map<String, String> _userProfile = {
+    'name': 'User Name',
+    'email': 'user@example.com',
+  };
+  Map<String, String> get userProfile => _userProfile;
 
   // Getters for filtered lists
   List<Medicine> _medicines = []; // Internal storage
@@ -207,6 +217,7 @@ class MedicineProvider extends ChangeNotifier {
             hour: hour,
             minute: minute,
             repeats: true,
+            payload: {'medicineId': medicine.id},
           );
         } else if (medicine.interval == 7) {
           // Weekly
@@ -218,6 +229,7 @@ class MedicineProvider extends ChangeNotifier {
             minute: minute,
             weekday: start.weekday,
             repeats: true,
+            payload: {'medicineId': medicine.id},
           );
         } else {
           // Every X days - schedule next 10 occurrences manually
@@ -256,6 +268,7 @@ class MedicineProvider extends ChangeNotifier {
               minute: minute,
               day: occurrenceDate,
               repeats: false, // Single day notification
+              payload: {'medicineId': medicine.id, 'occurrence': i.toString()},
             );
           }
         }
@@ -316,6 +329,27 @@ class MedicineProvider extends ChangeNotifier {
     debugPrint('Medicines reloaded');
     debugPrint('========================');
     
+    notifyListeners();
+  }
+
+  void toggleNotifications() async {
+    _notificationsEnabled = !_notificationsEnabled;
+    notifyListeners();
+    
+    if (!_notificationsEnabled) {
+      // Cancel everything
+      await AwesomeNotifications().cancelAllSchedules();
+    } else {
+      // Reschedule all active medicines
+      for (final med in activeMedicines) {
+        await _scheduleNotifications(med);
+      }
+    }
+  }
+
+  void updateProfile(String name, String email) {
+    _userProfile['name'] = name;
+    _userProfile['email'] = email;
     notifyListeners();
   }
 }

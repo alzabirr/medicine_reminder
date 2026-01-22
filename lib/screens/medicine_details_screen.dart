@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/core/theme.dart';
@@ -9,23 +10,44 @@ import 'package:medi/screens/add_medicine_screen.dart';
 import 'package:medi/widgets/floating_glass_action_bar.dart';
 import 'package:intl/intl.dart';
 
-class MedicineDetailsScreen extends StatelessWidget {
+class MedicineDetailsScreen extends StatefulWidget {
   final Medicine medicine;
-
   const MedicineDetailsScreen({super.key, required this.medicine});
+
+  @override
+  State<MedicineDetailsScreen> createState() => _MedicineDetailsScreenState();
+}
+
+class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Refresh UI every minute to update time-based stats (Doses Today)
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<MedicineProvider>(
       builder: (context, provider, child) {
         final latestMedicine = provider.medicines.firstWhere(
-          (m) => m.id == medicine.id,
-          orElse: () => medicine,
+          (m) => m.id == widget.medicine.id,
+          orElse: () => widget.medicine,
         );
         
         return Scaffold(
           backgroundColor: AppTheme.surfaceColor,
-          extendBody: true, // Allow body to go under the glass bar
+          extendBody: true,
           appBar: _buildAppBar(context),
           body: Stack(
             children: [
@@ -46,16 +68,13 @@ class MedicineDetailsScreen extends StatelessWidget {
       leading: Padding(
         padding: const EdgeInsets.only(left: 16),
         child: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      title: Text(
+      title: const Text(
         'Medicine Info',
-        style: TextStyle(
-          color: Theme.of(context).textTheme.titleLarge?.color,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
       centerTitle: true,
     );
@@ -64,7 +83,7 @@ class MedicineDetailsScreen extends StatelessWidget {
   Widget _buildBody(BuildContext context, Medicine med) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 120.0), // Extra bottom padding for floating bar
+      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 120.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -87,48 +106,39 @@ class MedicineDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildVibrantHeader(BuildContext context, Medicine med) {
-    final primaryColor = Theme.of(context).primaryColor;
-    
     return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          
-          // Main Neumorphic Container
-          Container(
-            width: 160,
-            height: 160,
+      child: Container(
+        width: 160,
+        height: 160,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          shape: BoxShape.circle,
+          boxShadow: AppTheme.neumorphicShadow,
+        ),
+        child: Center(
+          child: Container(
+            width: 140,
+            height: 140,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceColor,
               shape: BoxShape.circle,
-              boxShadow: AppTheme.neumorphicShadow,
+              color: AppTheme.surfaceColor,
+              boxShadow: AppTheme.neumorphicShadowInset,
             ),
-            child: Center(
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.surfaceColor,
-                  boxShadow: AppTheme.neumorphicShadowInset,
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Container(
-                  decoration: const BoxDecoration(shape: BoxShape.circle),
-                  clipBehavior: Clip.antiAlias,
-                  child: med.imagePath != null
-                      ? Image.file(File(med.imagePath!), fit: BoxFit.cover)
-                      : MedicineUtils.buildTypeIcon(
-                          context, 
-                          med.type, 
-                          size: 60,
-                          color: primaryColor,
-                        ),
-                ),
-              ),
+            padding: const EdgeInsets.all(20),
+            child: Container(
+              decoration: const BoxDecoration(shape: BoxShape.circle),
+              clipBehavior: Clip.antiAlias,
+              child: med.imagePath != null
+                  ? Image.file(File(med.imagePath!), fit: BoxFit.cover)
+                  : MedicineUtils.buildTypeIcon(
+                      context, 
+                      med.type, 
+                      size: 60,
+                      color: Theme.of(context).primaryColor,
+                    ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -185,7 +195,6 @@ class MedicineDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildProgressSection(BuildContext context, Medicine med) {
-    // Calculate progress
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = DateTime(med.startTime.year, med.startTime.month, med.startTime.day);
@@ -198,6 +207,19 @@ class MedicineDetailsScreen extends StatelessWidget {
     final elapsedDays = today.difference(start).inDays + 1;
     final progress = (elapsedDays / totalDays).clamp(0.0, 1.0);
     final isCompleted = med.endDate != null && today.isAfter(med.endDate!);
+    
+    final List<TimeOfDay> sortedSlots = med.timeSlots
+        .map((s) => MedicineUtils.parseTime(s))
+        .where((t) => t != null)
+        .cast<TimeOfDay>()
+        .toList()
+      ..sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
+
+    int dosesPassedToday = 0;
+    for (final time in sortedSlots) {
+       final scheduledDateTime = DateTime(today.year, today.month, today.day, time.hour, time.minute);
+       if (scheduledDateTime.isBefore(now)) dosesPassedToday++;
+    }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,13 +258,6 @@ class MedicineDetailsScreen extends StatelessWidget {
                   colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.6)],
                 ),
                 borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
             ),
           ),
@@ -250,7 +265,7 @@ class MedicineDetailsScreen extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildStatCard(context, 'Doses Taken', '${med.takenHistory.length}', Icons.check_circle_outline, Colors.green),
+            _buildStatCard(context, 'Doses Today', '$dosesPassedToday / ${med.timeSlots.length}', Icons.check_circle_outline, Colors.green),
             const SizedBox(width: 12),
             _buildStatCard(context, 'Day', '$elapsedDays / $totalDays', Icons.calendar_today, Colors.blue),
           ],
@@ -286,7 +301,7 @@ class MedicineDetailsScreen extends StatelessWidget {
       children: med.timeSlots.map((slot) {
         final pivotIndex = slot.indexOf(':');
         final label = pivotIndex != -1 ? slot.substring(0, pivotIndex).trim() : slot;
-        final time = pivotIndex != -1 ? slot.substring(pivotIndex + 1).trim() : '';
+        final timeStr = pivotIndex != -1 ? slot.substring(pivotIndex + 1).trim() : '';
 
         Color accentColor;
         IconData icon;
@@ -330,7 +345,7 @@ class MedicineDetailsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.textPrimary)),
-                    Text(time, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(timeStr, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -494,14 +509,6 @@ class MedicineDetailsScreen extends StatelessWidget {
               Provider.of<MedicineProvider>(context, listen: false).deleteMedicine(med.id);
               Navigator.pop(ctx); 
               Navigator.pop(context); 
-              ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(
-                   content: Text('${med.name} moved to trash'),
-                   behavior: SnackBarBehavior.floating,
-                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                   duration: const Duration(seconds: 1),
-                 ),
-              );
             },
             child: const Text('Move to Trash', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900)),
           ),

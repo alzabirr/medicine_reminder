@@ -9,7 +9,8 @@ import 'package:medi/widgets/medicine_card.dart';
 import 'package:medi/widgets/neumorphic_container.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart'; // Added
+import 'package:table_calendar/table_calendar.dart';
+import 'package:medi/screens/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -200,22 +201,43 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              shape: BoxShape.circle,
-                              boxShadow: AppTheme.neumorphicShadow,
-                            ),
-                            child: IconButton(
-                              icon: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 22),
-                              onPressed: () {
-                                setState(() {
-                                  _calendarFormat = _calendarFormat == CalendarFormat.week
-                                      ? CalendarFormat.month
-                                      : CalendarFormat.week;
-                                });
-                              },
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: AppTheme.neumorphicShadow,
+                                ),
+                                child: IconButton(
+                                  icon: Icon(Icons.settings_outlined, color: Theme.of(context).primaryColor, size: 22),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: AppTheme.neumorphicShadow,
+                                ),
+                                child: IconButton(
+                                  icon: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 22),
+                                  onPressed: () {
+                                    setState(() {
+                                      _calendarFormat = _calendarFormat == CalendarFormat.week
+                                          ? CalendarFormat.month
+                                          : CalendarFormat.week;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -307,59 +329,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               itemCount: dailyMedicines.length,
                               itemBuilder: (context, index) {
                                 final medicine = dailyMedicines[index];
-                                return Dismissible(
-                                  key: Key(medicine.id),
-                                  direction: DismissDirection.endToStart,
-                                  background: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                    child: Container(
-                                      alignment: Alignment.centerRight,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [Colors.red.shade400, Colors.red.shade600],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(24),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.red.withValues(alpha: 0.2),
-                                            blurRadius: 10,
-                                            offset: const Offset(4, 0),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const SizedBox.shrink(),
-                                    ),
-                                  ),
-                                  confirmDismiss: (direction) async {
-                                    return true;
+                                return MedicineCard(
+                                  medicine: medicine,
+                                  dateContext: _selectedDay,
+                                  onTaken: () {
+                                    provider.toggleTaken(medicine, date: _selectedDay);
                                   },
-                                  onDismissed: (direction) {
-                                    provider.deleteMedicine(medicine.id);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${medicine.name} deleted'),
-                                        duration: const Duration(seconds: 1),
+                                  onCardTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MedicineDetailsScreen(medicine: medicine),
                                       ),
                                     );
                                   },
-                                  child: MedicineCard(
-                                    medicine: medicine,
-                                    dateContext: _selectedDay,
-                                    onTaken: () {
-                                      provider.toggleTaken(medicine, date: _selectedDay);
-                                    },
-                                    onCardTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => MedicineDetailsScreen(medicine: medicine),
-                                        ),
-                                      );
-                                    },
-                                  ),
                                 );
                               },
                             ),

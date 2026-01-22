@@ -1,8 +1,13 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import 'package:medi/providers/medicine_provider.dart';
+import 'package:medi/screens/medicine_details_screen.dart';
+import 'package:medi/models/medicine.dart';
 
 class NotificationService {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   
   // Singleton pattern not strictly necessary if used via Provider, but good practice
   static final NotificationService _instance = NotificationService._internal();
@@ -42,8 +47,41 @@ class NotificationService {
   /// Use this method to detect when the user taps on a notification or action button
   @pragma("vm:entry-point")
   static Future <void> onActionReceivedMethod(ReceivedAction receivedAction) async {
-    // Navigate to details page if needed
-    debugPrint("Action received: ${receivedAction.id}");
+    debugPrint("=== Notification Action Received ===");
+    debugPrint("Action ID: ${receivedAction.id}");
+    debugPrint("Payload: ${receivedAction.payload}");
+    
+    final payload = receivedAction.payload;
+    if (payload != null && payload.containsKey('medicineId')) {
+      final medicineId = payload['medicineId'];
+      
+      // Delay to ensure navigatorKey is assigned and context is ready
+      Future.delayed(const Duration(milliseconds: 600), () {
+        final context = navigatorKey.currentContext;
+        debugPrint("Navigator context available: ${context != null}");
+        
+        if (context != null) {
+          try {
+            final provider = Provider.of<MedicineProvider>(context, listen: false);
+            final medicine = provider.medicines.firstWhere(
+              (m) => m.id == medicineId,
+              orElse: () => throw Exception("Medicine not found in provider"),
+            );
+            
+            debugPrint("Navigating to details for: ${medicine.name}");
+            
+            // Push notification details. If already on a detail page, replace it.
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => MedicineDetailsScreen(medicine: medicine),
+              ),
+            );
+          } catch (e) {
+            debugPrint("Navigation Error: $e");
+          }
+        }
+      });
+    }
   }
 
   Future<List<NotificationPermission>> requestPermissions() async {
@@ -87,6 +125,7 @@ class NotificationService {
     int? weekday, // 1-7 (Mon-Sun)
     DateTime? day, // Specific day
     bool repeats = true,
+    Map<String, String>? payload,
   }) async {
     
     await AwesomeNotifications().createNotification(
@@ -101,6 +140,7 @@ class NotificationService {
         fullScreenIntent: true,
         autoDismissible: false,
         backgroundColor: Colors.deepPurple,
+        payload: payload,
       ),
       schedule: NotificationCalendar(
         weekday: weekday,
