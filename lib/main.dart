@@ -2,14 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:medi/core/theme.dart';
 import 'package:medi/screens/main_screen.dart';
+import 'package:medi/screens/get_started_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/services/notification_service.dart';
 
 import 'package:medi/providers/theme_provider.dart';
 
+import 'package:hive_flutter/hive_flutter.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive and open settings box for onboarding check
+  await Hive.initFlutter();
+  await Hive.openBox('settings');
+  final bool isOnboardingDone = Hive.box('settings').get('onboarding_done', defaultValue: false);
   
   await AwesomeNotifications().initialize(
     null, // default icon
@@ -46,13 +54,15 @@ void main() async {
         ChangeNotifierProvider(create: (_) => medicineProvider),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: const MedicineReminderApp(),
+      child: MedicineReminderApp(isOnboardingDone: isOnboardingDone),
     ),
   );
 }
 
 class MedicineReminderApp extends StatelessWidget {
-  const MedicineReminderApp({super.key});
+  final bool isOnboardingDone;
+  
+  const MedicineReminderApp({super.key, required this.isOnboardingDone});
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +79,7 @@ class MedicineReminderApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: AppTheme.primaryColor, brightness: Brightness.dark),
       ),
       themeMode: themeProvider.themeMode,
-      home: const MainScreen(),
+      home: isOnboardingDone ? const MainScreen() : const GetStartedScreen(),
     );
   }
 }
