@@ -25,17 +25,13 @@ class PermissionRequiredScreen extends StatelessWidget {
               // Back Button
               Align(
                 alignment: Alignment.topLeft,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.surfaceColor,
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 1),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
                     child: Icon(
                       Icons.arrow_back_ios_new_rounded,
-                      size: 20,
+                      size: 28,
                       color: AppTheme.primaryColor,
                     ),
                   ),

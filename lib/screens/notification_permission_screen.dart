@@ -8,6 +8,8 @@ import 'package:medi/utils/navigation_utils.dart';
 import 'package:medi/widgets/neumorphic_container.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:awesome_notifications/awesome_notifications.dart';
+
 class NotificationPermissionScreen extends StatefulWidget {
   const NotificationPermissionScreen({super.key});
 
@@ -18,14 +20,32 @@ class NotificationPermissionScreen extends StatefulWidget {
 class _NotificationPermissionScreenState extends State<NotificationPermissionScreen> {
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPermissions();
+    });
+  }
+
+  Future<void> _checkPermissions() async {
+    bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (isAllowed && mounted) {
+      _navigateToMain();
+    }
+  }
+
   Future<void> _requestPermission() async {
     setState(() => _isLoading = true);
     try {
       await NotificationService().requestPermissions();
+      // Re-check after request
+      if (mounted) {
+         _checkPermissions();
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
-        _navigateToMain();
       }
     }
   }
@@ -64,19 +84,16 @@ class _NotificationPermissionScreenState extends State<NotificationPermissionScr
           child: Column(
             children: [
               // Back Button
+              // Back Button
               Align(
                 alignment: Alignment.topLeft,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.surfaceColor, // Optional: subtle background or transparent
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 1),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
                     child: Icon(
                       Icons.arrow_back_ios_new_rounded,
-                      size: 20,
+                      size: 28,
                       color: AppTheme.primaryColor,
                     ),
                   ),
