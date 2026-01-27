@@ -149,20 +149,20 @@ class _NotificationPermissionScreenState extends State<NotificationPermissionScr
                 child: NeumorphicContainer(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   borderRadius: 30,
-                  // Using surface color + primary text as requested in previous turn for neumorphic look
+                  color: AppTheme.primaryColor,
                   child: Center(
                     child: _isLoading 
                       ? const SizedBox(
                           width: 24, 
                           height: 24, 
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                         )
                       : Text(
                           'Allow',
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: AppTheme.primaryColor,
+                            color: Colors.white,
                           ),
                         ),
                   ),

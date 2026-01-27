@@ -46,6 +46,7 @@ void main() async {
   );
   
   final medicineProvider = MedicineProvider();
+  // Init will load medicines and schedule notifications for cold start
   await medicineProvider.init();
   
   runApp(
@@ -59,10 +60,37 @@ void main() async {
   );
 }
 
-class MedicineReminderApp extends StatelessWidget {
+class MedicineReminderApp extends StatefulWidget {
   final bool isOnboardingDone;
   
   const MedicineReminderApp({super.key, required this.isOnboardingDone});
+
+  @override
+  State<MedicineReminderApp> createState() => _MedicineReminderAppState();
+}
+
+class _MedicineReminderAppState extends State<MedicineReminderApp> with WidgetsBindingObserver {
+  
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+       // Refresh schedules when app comes to foreground
+       debugPrint("App Resumed: Refreshing Schedules...");
+       Provider.of<MedicineProvider>(context, listen: false).refreshAllSchedules(); 
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +107,7 @@ class MedicineReminderApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: AppTheme.primaryColor, brightness: Brightness.dark),
       ),
       themeMode: themeProvider.themeMode,
-      home: isOnboardingDone ? const MainScreen() : const GetStartedScreen(),
+      home: widget.isOnboardingDone ? const MainScreen() : const GetStartedScreen(),
     );
   }
 }

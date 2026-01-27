@@ -30,8 +30,11 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> init() async {
     await _databaseService.init();
     await _notificationService.init();
-    // Permissions should be requested from UI, not here blocking startup
     await loadMedicines();
+    
+    // Initial schedule refresh on app startup
+    await refreshAllSchedules();
+    
     _isLoading = false;
     notifyListeners();
   }
@@ -43,7 +46,7 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> addMedicine(Medicine medicine) async {
     await _databaseService.addMedicine(medicine);
-    await _scheduleNotifications(medicine);
+    await refreshAllSchedules(); // Centralized scheduling
     await loadMedicines();
   }
 
@@ -70,7 +73,7 @@ class MedicineProvider extends ChangeNotifier {
     await medicine.save();
     
     // Reschedule notifications
-    await _scheduleNotifications(medicine);
+    await refreshAllSchedules();
     
     await loadMedicines();
   }
@@ -107,7 +110,7 @@ class MedicineProvider extends ChangeNotifier {
     await medicine.save();
 
     // 3. Schedule New Notifications
-    await _scheduleNotifications(medicine);
+    await refreshAllSchedules();
     
     notifyListeners();
   }
@@ -131,53 +134,40 @@ class MedicineProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _scheduleNotifications(Medicine medicine) async {
-    // Validate if medicine should be active
-    final now = DateTime.now();
+  // Centralized Scheduling Logic
+  Future<void> refreshAllSchedules({DateTime? baseTime}) async {
+    if (!_notificationsEnabled) return;
+    
+    final now = baseTime ?? DateTime.now();
+    debugPrint('Refeshing all schedules at $now');
+
+    // We could optimize by comparing checksums, but for now we'll just ensure 
+    // coverage for all active medicines.
+    // Note: To avoid duplicate alarms, awesome_notifications handles ID conflicts by replacing.
+    // However, for interval meds, we might want to clear old future ones first if we want to be strict.
+    // For simplicity and robustness: just trigger scheduling for each.
+    
+    for (final medicine in activeMedicines) {
+      await _scheduleNotifications(medicine, baseTime: now);
+    }
+  }
+
+  Future<void> _scheduleNotifications(Medicine medicine, {DateTime? baseTime}) async {
+    final now = baseTime ?? DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
     
-    // 1. Check if medicine has already ended (BLOCK these)
+    // 1. Check if medicine has already ended
     if (medicine.endDate != null) {
       final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
       if (today.isAfter(end)) {
-        debugPrint('Medicine ${medicine.name} has already ended. No notifications scheduled.');
         return;
       }
     }
     
-    // 2. Interval Logic (Smart filtering for scheduling)
-    final diffDays = today.difference(start).inDays;
+    // 2. Schedule Window: Next 90 Days
+    const int scheduleWindowDays = 90;
     
-    bool shouldShowToday = false;
-    if (medicine.interval <= 1) {
-      shouldShowToday = true;
-    } else if (medicine.interval == 7) {
-      shouldShowToday = start.weekday == now.weekday;
-    } else {
-      // Every X Days logic
-      shouldShowToday = diffDays % medicine.interval == 0;
-    }
-
-    if (!shouldShowToday && !today.isBefore(start)) {
-      debugPrint('Medicine ${medicine.name} is not scheduled for today (Interval: ${medicine.interval}). No notification for today.');
-      // Note: This logic only blocks TODAY's notification. 
-      // AwesomeNotifications scheduling with NotificationCalendar(day: ...) 
-      // usually repeats BASED on that day. 
-      // However, for complex intervals like "Every 2 days", we can't easily 
-      // represent that in a single NotificationCalendar if it doesn't align with weekly/monthly.
-    }
-    
-    // If it's a future start date, we should only schedule TODAY if today is >= start.
-    // However, if we schedule a generic daily repeating one, it might ring too early.
-    // For now, let's skip scheduling if today is before start, 
-    // AND provide a mechanism to re-schedule when the app opens or dates change.
-    
-    if (today.isBefore(start)) {
-      debugPrint('Medicine ${medicine.name} starts in the future (${start.year}-${start.month}-${start.day}). Skipping scheduling for now.');
-      return;
-    }
-
     for (final slotString in medicine.timeSlots) {
       try {
         final pivotIndex = slotString.indexOf(':');
@@ -206,23 +196,48 @@ class MedicineProvider extends ChangeNotifier {
              continue; 
         }
         
-        final notificationId = (medicine.id + label).hashCode;
+        // Base Notification ID generated from MedicineID + SlotLabel
+        // usage: (base string).hashCode
+        final slotKey = medicine.id + label;
 
         if (medicine.interval == 1) {
-          // Daily
-          await _notificationService.scheduleNotification(
-            id: notificationId,
-            title: 'Daily: ${medicine.name}',
-            body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-            hour: hour,
-            minute: minute,
-            repeats: true,
-            payload: {'medicineId': medicine.id},
-          );
+          // Daily: Use standard repeating notification
+          // If start date is in future, we technically should wait.
+          // BUT AwesomeNotifications repeating daily starts "now" if we don't specify a date, 
+          // or starts on the specific date if we do.
+          
+          if (start.isAfter(today)) {
+             // Future start: Schedule a specific "Daily" starting from that date?
+             // AwesomeNotifications doesn't effortlessly support "Repeat Daily starting from X" 
+             // except by scheduling the first one on X with repeats=true.
+             
+             await _notificationService.scheduleNotification(
+                id: slotKey.hashCode,
+                title: 'Daily: ${medicine.name}',
+                body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                hour: hour,
+                minute: minute,
+                day: start, // Start on the start date
+                repeats: true,
+                payload: {'medicineId': medicine.id},
+             );
+          } else {
+             // Already started: Schedule for Today (or next occurrence by hour)
+             await _notificationService.scheduleNotification(
+                id: slotKey.hashCode,
+                title: 'Daily: ${medicine.name}',
+                body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                hour: hour,
+                minute: minute,
+                repeats: true,
+                payload: {'medicineId': medicine.id},
+             );
+          }
+          
         } else if (medicine.interval == 7) {
           // Weekly
-          await _notificationService.scheduleNotification(
-            id: notificationId,
+           await _notificationService.scheduleNotification(
+            id: slotKey.hashCode,
             title: 'Weekly: ${medicine.name}',
             body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
             hour: hour,
@@ -232,43 +247,55 @@ class MedicineProvider extends ChangeNotifier {
             payload: {'medicineId': medicine.id},
           );
         } else {
-          // Every X days - schedule next 10 occurrences manually
-          // Calculate the first valid occurrence on or after today
-          final daysSinceStart = today.difference(start).inDays;
-          int daysUntilNext = 0;
+          // Interval (Every X Days) - Rolling Window Logic
           
-          if (daysSinceStart >= 0) {
-            final remainder = daysSinceStart % medicine.interval;
-            if (remainder != 0) {
-              daysUntilNext = medicine.interval - remainder;
-            }
-          } else {
-            // Should not happen due to check above, but for safety:
-            daysUntilNext = start.difference(today).inDays;
+          // Calculate first valid occurrence relative to START date
+          // We need to find occurrences within [now, now + 90 days]
+          
+          final daysDesdeStart = today.difference(start).inDays;
+          
+          // Start iterating from a point that covers "today" or "future start"
+          // If daysDesdeStart < 0 (Future start), we start from 0 (Start Date)
+          // If daysDesdeStart >= 0, we find the next multiple of interval
+          
+          int startOffset = 0;
+          if (daysDesdeStart >= 0) {
+             final remainder = daysDesdeStart % medicine.interval;
+             if (remainder == 0) {
+               startOffset = daysDesdeStart; // Today is a dose day
+             } else {
+               startOffset = daysDesdeStart + (medicine.interval - remainder); // Next dose day
+             }
           }
-
-          final firstOccurrence = today.add(Duration(days: daysUntilNext));
-
-          for (int i = 0; i < 10; i++) {
-            final occurrenceDate = firstOccurrence.add(Duration(days: i * medicine.interval));
-            
-            // Limit to roughly a month out
-            if (occurrenceDate.difference(today).inDays > 60) break;
-
-            if (medicine.endDate != null) {
-               final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-               if (occurrenceDate.isAfter(end)) break;
-            }
-
-            await _notificationService.scheduleNotification(
-              id: (medicine.id + label + i.toString()).hashCode,
+          
+          // Now iterate forward for 90 days
+          for (int dayOffset = startOffset; ; dayOffset += medicine.interval) {
+             // Safety break if we drift too far backwards (unlikely)
+             if (dayOffset < daysDesdeStart && daysDesdeStart > 90) break; // Should not happen with logic above
+             
+             final occurrenceDate = start.add(Duration(days: dayOffset));
+             
+             // Stop if we exceed the window
+             if (occurrenceDate.difference(today).inDays > scheduleWindowDays) break;
+             
+             // Stop if we exceed End Date
+             if (medicine.endDate != null) {
+                final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+                if (occurrenceDate.isAfter(end)) break;
+             }
+             
+             // Unique ID for this specific occurrence: MedId + Slot + DateString
+             final occurrenceId = (slotKey + occurrenceDate.toIso8601String()).hashCode;
+             
+             await _notificationService.scheduleNotification(
+              id: occurrenceId,
               title: 'Medi: ${medicine.name}',
               body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
               hour: hour,
               minute: minute,
               day: occurrenceDate,
-              repeats: false, // Single day notification
-              payload: {'medicineId': medicine.id, 'occurrence': i.toString()},
+              repeats: false,
+              payload: {'medicineId': medicine.id},
             );
           }
         }
@@ -279,56 +306,72 @@ class MedicineProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> toggleTaken(Medicine medicine, {DateTime? date}) async {
+  Future<void> toggleTaken(Medicine medicine, {DateTime? date, String? timeSlot}) async {
     final targetDate = date ?? DateTime.now();
     
-    debugPrint('=== Toggle Taken Debug ===');
-    debugPrint('Medicine: ${medicine.name}');
-    debugPrint('Target Date: $targetDate');
-    debugPrint('Current takenHistory length: ${medicine.takenHistory.length}');
-    debugPrint('takenHistory type: ${medicine.takenHistory.runtimeType}');
-    
-    final todayEntries = medicine.takenHistory.where(
-      (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
-    ).toList();
-    
-    final isTakenMax = todayEntries.length >= medicine.timeSlots.length;
-
-    if (!isTakenMax) {
-      debugPrint('Adding another dose for today...');
-      try {
-        medicine.takenHistory.add(targetDate);
-      } catch (e) {
-        medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
-        medicine.takenHistory.add(targetDate);
+    // If timeslot provided, we use slot-specific logic
+    if (timeSlot != null) {
+      final pivotIndex = timeSlot.indexOf(':');
+      final timeStr = pivotIndex != -1 ? timeSlot.substring(pivotIndex + 1).trim() : timeSlot;
+      
+      // Parse to match the logic in isSlotTaken
+      int hour = 0;
+      int minute = 0;
+      final RegExp timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+      final match = timeRegex.firstMatch(timeStr);
+      if (match != null) {
+          int h = int.parse(match.group(1)!);
+          int m = int.parse(match.group(2)!);
+          final period = match.group(3)?.toLowerCase(); 
+          if (period == 'pm' && h != 12) h += 12;
+          if (period == 'am' && h == 12) h = 0;
+          hour = h;
+          minute = m;
       }
-    } else {
-      debugPrint('Resetting doses for today (Cycle)...');
-      try {
-        medicine.takenHistory.removeWhere(
-          (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+      
+      final isTaken = medicine.isSlotTaken(targetDate, timeSlot);
+      
+      if (isTaken) {
+        // Remove the specific entry matching date + time
+        medicine.takenHistory.removeWhere((dt) => 
+            dt.year == targetDate.year && 
+            dt.month == targetDate.month && 
+            dt.day == targetDate.day &&
+            dt.hour == hour &&
+            dt.minute == minute
         );
-      } catch (e) {
-        medicine.takenHistory = List<DateTime>.from(medicine.takenHistory);
-        medicine.takenHistory.removeWhere(
+      } else {
+        // Add new entry with correct date + time
+        final entry = DateTime(targetDate.year, targetDate.month, targetDate.day, hour, minute);
+        medicine.takenHistory.add(entry);
+      }
+      
+    } else {
+      // Fallback: Legacy "Daily Count" toggle if no slot specified (backward compatibility)
+      // We will try to guess the "next available slot" or just append NOW
+      // Current usage in Home Screen relies on this, so we should try to be smart.
+      
+      // Since we want to move to slot-based, we'll auto-assign to the first untaken slot of the day?
+      // Or just keep legacy behavior. Let's keep legacy behavior BUT try to align hours if possible.
+      
+      final todayEntries = medicine.takenHistory.where(
+        (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
+      ).toList();
+      
+      if (todayEntries.length < medicine.timeSlots.length) {
+         // Mark next as taken
+         medicine.takenHistory.add(targetDate);
+      } else {
+         // Reset
+         medicine.takenHistory.removeWhere(
           (d) => d.year == targetDate.year && d.month == targetDate.month && d.day == targetDate.day,
         );
       }
     }
 
-    debugPrint('New takenHistory length: ${medicine.takenHistory.length}');
-    debugPrint('Saving medicine...');
-    
     await medicine.save();
-    
-    debugPrint('Medicine saved successfully');
-    
     // Force reload from DB to ensure UI has latest state (fixes potential stale object issues)
     await loadMedicines();
-    
-    debugPrint('Medicines reloaded');
-    debugPrint('========================');
-    
     notifyListeners();
   }
 
@@ -341,9 +384,7 @@ class MedicineProvider extends ChangeNotifier {
       await AwesomeNotifications().cancelAllSchedules();
     } else {
       // Reschedule all active medicines
-      for (final med in activeMedicines) {
-        await _scheduleNotifications(med);
-      }
+      await refreshAllSchedules();
     }
   }
 

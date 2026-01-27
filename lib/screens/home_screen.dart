@@ -332,8 +332,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return MedicineCard(
                                   medicine: medicine,
                                   dateContext: _selectedDay,
-                                  onTaken: () {
-                                    provider.toggleTaken(medicine, date: _selectedDay);
+                                  onSlotTap: (slot) {
+                                    provider.toggleTaken(medicine, date: _selectedDay, timeSlot: slot);
                                   },
                                   onCardTap: () {
                                     Navigator.push(

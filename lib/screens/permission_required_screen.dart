@@ -87,13 +87,14 @@ class PermissionRequiredScreen extends StatelessWidget {
                 child: NeumorphicContainer(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   borderRadius: 30,
+                  color: AppTheme.primaryColor,
                   child: Center(
                     child: Text(
                       'Open Settings',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryColor,
+                        color: Colors.white,
                       ),
                     ),
                   ),

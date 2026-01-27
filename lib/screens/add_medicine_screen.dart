@@ -8,6 +8,8 @@ import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/utils/medicine_utils.dart';
 import 'package:medi/core/theme.dart';
 import 'package:medi/widgets/floating_glass_action_bar.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:medi/widgets/neumorphic_container.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,7 +28,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   String _selectedType = 'Tablet';
   final List<String> _types = ['Tablet', 'Pill', 'Liquid', 'Injection', 'Drop', 'Topical', 'Inhaler'];
 
-  final Map<String, TimeOfDay> _selectedTimeSlots = {}; // {'Morning': TimeOfDay...}
+  final List<DoseSlot> _selectedTimeSlots = []; 
   String _selectedInstruction = 'After Meal'; // 'Before Meal', 'After Meal', 'Any Time'
 
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
@@ -74,31 +76,34 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
          }
       }
       
-      // Parse time slots
-      for (final slot in m.timeSlots) {
-         final pivot = slot.indexOf(':');
-         if (pivot != -1) {
-            final label = slot.substring(0, pivot).trim();
-            final timeStr = slot.substring(pivot + 1).trim();
-            
-            try {
-               final timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
-               final match = timeRegex.firstMatch(timeStr);
-               if (match != null) {
-                  int h = int.parse(match.group(1)!);
-                  int m = int.parse(match.group(2)!);
-                  final period = match.group(3)?.toLowerCase();
-
-                  if (period == 'pm' && h != 12) h += 12;
-                  if (period == 'am' && h == 12) h = 0;
-                  
-                  _selectedTimeSlots[label] = TimeOfDay(hour: h, minute: m);
-               }
-            } catch (e) {
-               debugPrint('Error parsing time for edit: $timeStr');
-            }
-         }
-      }
+        // Parse time slots
+        for (final slot in m.timeSlots) {
+           final pivot = slot.indexOf(':');
+           if (pivot != -1) {
+              final label = slot.substring(0, pivot).trim();
+              final timeStr = slot.substring(pivot + 1).trim();
+              
+              try {
+                 final timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+                 final match = timeRegex.firstMatch(timeStr);
+                 if (match != null) {
+                    int h = int.parse(match.group(1)!);
+                    int m = int.parse(match.group(2)!);
+                    final period = match.group(3)?.toLowerCase();
+  
+                    if (period == 'pm' && h != 12) h += 12;
+                    if (period == 'am' && h == 12) h = 0;
+                    
+                    _selectedTimeSlots.add(DoseSlot(label: label, time: TimeOfDay(hour: h, minute: m)));
+                 }
+              } catch (e) {
+                 debugPrint('Error parsing time for edit: $timeStr');
+              }
+           }
+        }
+    } else {
+      // Default initial slot for new medicine
+      _selectedTimeSlots.add(DoseSlot(label: 'Morning', time: const TimeOfDay(hour: 8, minute: 0)));
     }
   }
 
@@ -196,10 +201,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         return;
       }
 
-      final List<String> formattedTimeSlots = _selectedTimeSlots.entries.map((e) {
-        final time = e.value;
-        final timeString = time.format(context);
-        return '${e.key}: $timeString';
+      final List<String> formattedTimeSlots = _selectedTimeSlots.map((e) {
+        final timeString = e.time.format(context);
+        return '${e.label}: $timeString';
       }).toList();
 
       if (widget.medicine != null) {
@@ -313,15 +317,289 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     );
   }
 
-  Widget _buildFrequencyChip(String label, IconData icon, List<Color> gradientColors) {
-    final isSelected = _selectedTimeSlots.containsKey(label);
-    final selectedTime = _selectedTimeSlots[label];
+  void _showAddDoseDialog({DoseSlot? existingSlot, int? index}) {
+    final TextEditingController labelController = TextEditingController(text: existingSlot?.label ?? '');
+    TimeOfDay selectedTime = existingSlot?.time ?? const TimeOfDay(hour: 8, minute: 0);
+
+    final List<String> suggestions = ['Morning', 'Noon', 'Evening', 'Night', 'Afternoon'];
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.schedule_rounded,
+                            color: AppTheme.primaryColor,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            existingSlot != null ? 'Edit Dose' : 'Add New Dose',
+                            style: GoogleFonts.outfit(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Label Input Section
+                    Text(
+                      'Dose Label',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Quick Suggestions
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: suggestions.map((s) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            label: Text(s),
+                            onPressed: () {
+                              labelController.text = s;
+                            },
+                            backgroundColor: AppTheme.surfaceColor,
+                            labelStyle: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Custom Input
+                    TextField(
+                      controller: labelController,
+                      decoration: InputDecoration(
+                        hintText: 'type your Does label',
+                        hintStyle: GoogleFonts.outfit(
+                          color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.surfaceColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Time Section
+                    Text(
+                      'Time',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Time Picker
+                    GestureDetector(
+                      onTap: () async {
+                        final TimeOfDay? picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime,
+                        );
+                        if (picked != null) {
+                          setDialogState(() => selectedTime = picked);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              color: AppTheme.primaryColor,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              selectedTime.format(context),
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.primaryColor,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.edit_rounded,
+                              color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.outfit(
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () {
+                              if (labelController.text.trim().isEmpty) return;
+                              
+                              setState(() {
+                                if (existingSlot != null && index != null) {
+                                  _selectedTimeSlots[index] = DoseSlot(
+                                    label: labelController.text.trim(),
+                                    time: selectedTime,
+                                  );
+                                } else {
+                                  _selectedTimeSlots.add(DoseSlot(
+                                    label: labelController.text.trim(),
+                                    time: selectedTime,
+                                  ));
+                                }
+                              });
+                              Navigator.pop(context);
+                            },
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  existingSlot != null ? Icons.check_rounded : Icons.add_rounded,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  existingSlot != null ? 'Save Changes' : 'Add Dose',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardFrequencyChip(String label, IconData icon, List<Color> gradientColors) {
+    // Check if this standard label exists in our list
+    final existingIndex = _selectedTimeSlots.indexWhere((s) => s.label == label);
+    final isSelected = existingIndex != -1;
+    final selectedTime = isSelected ? _selectedTimeSlots[existingIndex].time : null;
 
     return GestureDetector(
       onTap: () async {
         if (isSelected) {
           setState(() {
-            _selectedTimeSlots.remove(label);
+            _selectedTimeSlots.removeAt(existingIndex);
           });
         } else {
           TimeOfDay initialTime;
@@ -336,25 +614,31 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           final TimeOfDay? picked = await showTimePicker(
             context: context,
             initialTime: initialTime,
-            builder: (BuildContext context, Widget? child) {
-              return MediaQuery(
-                data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-                child: child!,
-              );
-            },
           );
 
           if (picked != null) {
             setState(() {
-              _selectedTimeSlots[label] = picked;
+              _selectedTimeSlots.add(DoseSlot(label: label, time: picked));
             });
           }
         }
       },
+      onLongPress: isSelected ? () async {
+        final TimeOfDay? picked = await showTimePicker(
+          context: context,
+          initialTime: selectedTime!,
+        );
+        if (picked != null) {
+          setState(() {
+            _selectedTimeSlots[existingIndex] = DoseSlot(label: label, time: picked);
+          });
+        }
+      } : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        height: 95, // Reduced from 112
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10), // Reduced vertical padding
+        width: 80,
+        height: 95,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         decoration: BoxDecoration(
           gradient: isSelected 
              ? LinearGradient(
@@ -371,14 +655,14 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             width: 1,
           ),
           boxShadow: isSelected 
-              ? [] // Remove shadow when selected
+              ? [] 
               : AppTheme.neumorphicShadow,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(6), // Reduced from 8
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
                 shape: BoxShape.circle,
@@ -386,20 +670,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               child: Icon(
                 icon, 
                 color: isSelected ? Colors.white : gradientColors.first.withValues(alpha: 0.7), 
-                size: 20, // Reduced from 22
+                size: 20,
               ),
             ),
-            const SizedBox(height: 4), // Reduced from 6
+            const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.outfit(
                 color: isSelected ? Colors.white : AppTheme.textPrimary,
                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                fontSize: 11, // Reduced from 13
+                fontSize: 11,
               ),
             ),
             if (isSelected && selectedTime != null) ...[
-              const SizedBox(height: 2), // Reduced from 4
+              const SizedBox(height: 2),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -411,11 +695,61 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
-                    fontSize: 10,
+                    fontSize: 9,
                   ),
                 ),
               ),
             ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomDoseChip(DoseSlot slot, int index) {
+    IconData icon = Icons.medication_rounded;
+    List<Color> gradient = [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)];
+
+    return GestureDetector(
+      onTap: () => _showAddDoseDialog(existingSlot: slot, index: index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(10),
+        width: 80,
+        height: 95,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: gradient.first.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                 const SizedBox(width: 14), // Spacer for balance
+                 GestureDetector(
+                    onTap: () => setState(() => _selectedTimeSlots.removeAt(index)),
+                    child: Icon(Icons.cancel, color: Colors.white.withValues(alpha: 0.5), size: 14),
+                 ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              slot.label,
+              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              slot.time.format(context),
+              style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600, fontSize: 9),
+            ),
           ],
         ),
       ),
@@ -723,32 +1057,105 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                   // Frequency
                   _buildSectionLabel('Reminder Frequency'),
                   const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                       Expanded(
-                         child: _buildFrequencyChip(
-                           'Morning', 
-                           Icons.wb_sunny_rounded, 
-                           [const Color(0xFFFF9800), const Color(0xFFFFC107)] // Bold Sunrise
-                         )
-                       ),
-                       const SizedBox(width: 12),
-                       Expanded(
-                         child: _buildFrequencyChip(
-                           'Noon', 
-                           Icons.wb_cloudy_rounded, 
-                           [const Color(0xFF2196F3), const Color(0xFF03A9F4)] // Bold Day
-                         )
-                       ),
-                       const SizedBox(width: 12),
-                       Expanded(
-                         child: _buildFrequencyChip(
-                           'Night', 
-                           Icons.nights_stay_rounded, 
-                           [const Color(0xFF3F51B5), const Color(0xFF673AB7)] // Bold Evening
-                         )
-                       ),
+                      // Primary Row: Morning, Noon, Night + Add More
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 12,
+                        children: [
+                          _buildStandardFrequencyChip(
+                            'Morning', 
+                            Icons.wb_sunny_rounded, 
+                            [const Color(0xFFFF9800), const Color(0xFFFFC107)]
+                          ),
+                          _buildStandardFrequencyChip(
+                            'Noon', 
+                            Icons.wb_cloudy_rounded, 
+                            [const Color(0xFF2196F3), const Color(0xFF03A9F4)]
+                          ),
+                          _buildStandardFrequencyChip(
+                            'Night', 
+                            Icons.nights_stay_rounded, 
+                            [const Color(0xFF3F51B5), const Color(0xFF673AB7)]
+                          ),
+                          
+                          // Add More Button (beautifully styled on the side)
+                          GestureDetector(
+                            onTap: () => _showAddDoseDialog(),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 80,
+                              height: 95,
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.primaryColor.withValues(alpha: 0.08),
+                                    AppTheme.primaryColor.withValues(alpha: 0.04),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                                  width: 1.5,
+                                  strokeAlign: BorderSide.strokeAlignInside,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.add_rounded, 
+                                      color: AppTheme.primaryColor, 
+                                      size: 20
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Add More',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.outfit(
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // Custom Doses (if any)
+                      if (_selectedTimeSlots.any((s) => s.label != 'Morning' && s.label != 'Noon' && s.label != 'Night')) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 12,
+                          children: _selectedTimeSlots.asMap().entries.where((e) {
+                            final label = e.value.label;
+                            return label != 'Morning' && label != 'Noon' && label != 'Night';
+                          }).map((e) => _buildCustomDoseChip(e.value, e.key)).toList(),
+                        ),
+                      ],
                     ],
                   ),
                   
@@ -822,6 +1229,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       ),
     );
   }
+}
+
+class DoseSlot {
+  final String label;
+  final TimeOfDay time;
+  DoseSlot({required this.label, required this.time});
 }
 
 // Optimized widget to handle hint animation without re-rendering entire screen

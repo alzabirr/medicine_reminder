@@ -80,7 +80,7 @@ class GetStartedScreen extends StatelessWidget {
                 child: NeumorphicContainer(
                   padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 32),
                   borderRadius: 30,
-                  // color: Default is surface, which is what we want for neumorphic
+                  color: AppTheme.primaryColor,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -89,11 +89,9 @@ class GetStartedScreen extends StatelessWidget {
                         style: GoogleFonts.outfit(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.primaryColor, // Primary color text
+                          color: Colors.white,
                         ),
                       ),
-                      
-                      
                     ],
                   ),
                 ),

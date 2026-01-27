@@ -105,7 +105,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
+        child: const Center(
+          child: Icon(Icons.add_rounded, color: Colors.white, size: 32),
+        ),
       ),
     );
   }

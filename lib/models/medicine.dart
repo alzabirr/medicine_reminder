@@ -55,11 +55,42 @@ class Medicine extends HiveObject {
     this.isDeleted = false,
   }) : takenHistory = takenHistory ?? [];
 
-  bool isTakenOn(DateTime date) {
+  bool isSlotTaken(DateTime date, String timeSlot) {
+    if (takenHistory.isEmpty) return false;
+    
+    // Parse the time slot to get expected hour/minute
+    final pivotIndex = timeSlot.indexOf(':');
+    final timeStr = pivotIndex != -1 
+          ? timeSlot.substring(pivotIndex + 1).trim() 
+          : timeSlot;
+          
+    int hour = 0;
+    int minute = 0;
+    
+    final RegExp timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+    final match = timeRegex.firstMatch(timeStr);
+
+    if (match != null) {
+        int h = int.parse(match.group(1)!);
+        int m = int.parse(match.group(2)!);
+        final period = match.group(3)?.toLowerCase(); 
+
+        if (period == 'pm' && h != 12) h += 12;
+        if (period == 'am' && h == 12) h = 0;
+        
+        hour = h;
+        minute = m;
+    } else {
+      return false;
+    }
+
+    // Check if any taken entry matches this specific date + time
     return takenHistory.any((dt) => 
       dt.year == date.year && 
       dt.month == date.month && 
-      dt.day == date.day
+      dt.day == date.day &&
+      dt.hour == hour &&
+      dt.minute == minute
     );
   }
 }

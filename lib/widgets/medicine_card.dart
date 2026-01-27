@@ -12,13 +12,13 @@ import 'dart:async';
 class MedicineCard extends StatefulWidget {
   final Medicine medicine;
   final VoidCallback? onCardTap;
-  final VoidCallback? onTaken;
+  final Function(String slot)? onSlotTap;
   final DateTime? dateContext;
 
   const MedicineCard({
     super.key,
     required this.medicine,
-    this.onTaken,
+    this.onSlotTap,
     this.onCardTap,
     this.dateContext,
   });
@@ -63,8 +63,10 @@ class _MedicineCardState extends State<MedicineCard> {
     final takenCountToday = widget.medicine.takenHistory.where(
       (d) => d.year == todayMidnight.year && d.month == todayMidnight.month && d.day == todayMidnight.day,
     ).length;
-
-    // Course progress
+    
+    // Course progress logic remains similar? 
+    // Actually, for "Display Day", checking start date is fine.
+    
     final startAtMidnight = DateTime(widget.medicine.startTime.year, widget.medicine.startTime.month, widget.medicine.startTime.day);
     final displayDay = targetDay.difference(startAtMidnight).inDays + 1;
     final totalDays = widget.medicine.endDate != null 
@@ -72,14 +74,12 @@ class _MedicineCardState extends State<MedicineCard> {
         : 1;
     final displayDayClamped = displayDay.clamp(1, totalDays);
 
-    // Course is fully finished ONLY if past end date OR (on end date AND today is complete)
+    // Course is fully finished logic
     bool isFullyFinished = false;
     if (widget.medicine.endDate != null) {
       final endAtMidnight = DateTime(widget.medicine.endDate!.year, widget.medicine.endDate!.month, widget.medicine.endDate!.day);
       if (todayMidnight.isAfter(endAtMidnight)) {
         isFullyFinished = true;
-      } else if (todayMidnight.isAtSameMomentAs(endAtMidnight)) {
-        isFullyFinished = MedicineUtils.areAllTimeSlotsPassedToday(widget.medicine, takenCount: takenCountToday);
       }
     }
     
@@ -94,18 +94,18 @@ class _MedicineCardState extends State<MedicineCard> {
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: AppTheme.getNeumorphicShadow(context),
-            border: null, // Removed border for Course Finish
+            border: null, 
           ),
           child: Opacity(
             opacity: isFullyFinished ? 0.85 : 1.0,
             child: Padding(
-              padding: const EdgeInsets.all(14.0),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
               child: Row(
                 children: [
                   // Premium Layered Icon
                   Container(
-                    width: 58,
-                    height: 58,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       shape: BoxShape.circle,
@@ -115,8 +115,8 @@ class _MedicineCardState extends State<MedicineCard> {
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 38,
+                          height: 38,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -124,8 +124,8 @@ class _MedicineCardState extends State<MedicineCard> {
                           ),
                         ),
                         Container(
-                          width: 40,
-                          height: 40,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -133,11 +133,13 @@ class _MedicineCardState extends State<MedicineCard> {
                           clipBehavior: Clip.antiAlias,
                           child: widget.medicine.imagePath != null
                               ? Image.file(File(widget.medicine.imagePath!), fit: BoxFit.cover)
-                              : MedicineUtils.buildTypeIcon(
-                                  context, 
-                                  widget.medicine.type, 
-                                  size: 24,
-                                  color: Theme.of(context).primaryColor,
+                              : Center(
+                                  child: MedicineUtils.buildTypeIcon(
+                                    context, 
+                                    widget.medicine.type, 
+                                    size: 18,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
                                 ),
                         ),
                         if (isFullyFinished)
@@ -153,14 +155,14 @@ class _MedicineCardState extends State<MedicineCard> {
                               child: const Icon(
                                 Icons.check_circle,
                                 color: AppTheme.successColor,
-                                size: 18,
+                                size: 16,
                               ),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
       
                   // Info
                   Expanded(
@@ -176,74 +178,77 @@ class _MedicineCardState extends State<MedicineCard> {
                                 widget.medicine.name,
                                 style: TextStyle(
                                    fontWeight: FontWeight.w700,
-                                   fontSize: 16,
+                                   fontSize: 15,
                                    color: AppTheme.textPrimary,
                                    letterSpacing: -0.3,
-                                   // Removed strike-through
                                 ),
                               ),
                             ),
-                            // Day Progress Badge (Always Show)
+                            // Day Progress Badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '$displayDayClamped/$totalDays',
                                 style: TextStyle(
                                   color: Theme.of(context).primaryColor,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         // Time Slots
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: 4,
+                          runSpacing: 4,
                           children: widget.medicine.timeSlots.map((timeSlot) {
-                            // Find index of this slot
-                            final index = widget.medicine.timeSlots.indexOf(timeSlot);
                             final time = MedicineUtils.parseTime(timeSlot);
                             if (time == null) return const SizedBox.shrink();
                             
-                            // Mark as DONE if taken OR if time has passed for this specific day
-                            bool isTaken = index < takenCountForDate;
-                            bool hasPassed = false;
+                            // New Logic: 
+                            // 1. Visual: If time passed -> Green.
+                            // 2. Interaction: User cannot toggle from card (Read-only).
                             
+                            bool isTaken = widget.medicine.isSlotTaken(targetDay, timeSlot);
+
                             final scheduledDateTime = DateTime(targetDay.year, targetDay.month, targetDay.day, time.hour, time.minute);
-                            hasPassed = scheduledDateTime.isBefore(now);
+                            final isPassed = scheduledDateTime.isBefore(now);
                             
-                            final isDone = isTaken || hasPassed;
+                            // Visual State
+                            final isDone = isTaken || isPassed; // Green if taken OR passed (Auto-green)
                             
                             final colonIndex = timeSlot.indexOf(':');
                             final timeText = colonIndex != -1 ? timeSlot.substring(colonIndex + 1).trim() : timeSlot;
                             
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: isDone
-                                    ? AppTheme.successColor.withValues(alpha: 0.1)
+                                    ? AppTheme.successColor.withValues(alpha: 0.15)
                                     : Theme.of(context).primaryColor.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(8),
+                                border: isDone ? Border.all(color: AppTheme.successColor.withValues(alpha: 0.5), width: 1) : null,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (isDone) ...[
-                                    Icon(Icons.check, size: 10, color: AppTheme.successColor),
-                                    const SizedBox(width: 3),
+                                    Icon(Icons.check, size: 12, color: AppTheme.successColor),
+                                    const SizedBox(width: 4),
                                   ],
                                   Text(
                                     timeText,
                                     style: TextStyle(
-                                      color: isDone ? AppTheme.successColor : Theme.of(context).primaryColor,
-                                      fontSize: 12,
+                                      color: isDone 
+                                          ? AppTheme.successColor 
+                                          : Theme.of(context).primaryColor,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -252,18 +257,18 @@ class _MedicineCardState extends State<MedicineCard> {
                             );
                           }).toList(),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 3),
                         
                         // Instruction
                         Row(
                           children: [
-                            Icon(Icons.restaurant_menu, size: 12, color: AppTheme.textSecondary.withValues(alpha: 0.6)),
+                            Icon(Icons.restaurant_menu, size: 10, color: AppTheme.textSecondary.withValues(alpha: 0.6)),
                             const SizedBox(width: 4),
                             Text(
                               widget.medicine.instruction ?? 'Any Time',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -290,17 +295,17 @@ class _MedicineCardState extends State<MedicineCard> {
                                       color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(Icons.alarm, size: 12, color: Theme.of(context).primaryColor),
+                                  child: Icon(Icons.alarm, size: 10, color: Theme.of(context).primaryColor),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Next in ${MedicineUtils.formatDuration(remaining)}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).primaryColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Next in ${MedicineUtils.formatDuration(remaining)}',
-                                    style: TextStyle(
-                                      color: Theme.of(context).primaryColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                ),
                                 ],
                               ),
                             );
