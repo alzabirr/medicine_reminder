@@ -102,8 +102,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
            }
         }
     } else {
-      // Default initial slot for new medicine
-      _selectedTimeSlots.add(DoseSlot(label: 'Morning', time: const TimeOfDay(hour: 8, minute: 0)));
+      // No default slots, user will select as they like
+      _selectedTimeSlots.clear();
     }
   }
 

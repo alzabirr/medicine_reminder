@@ -99,13 +99,13 @@ class _MedicineCardState extends State<MedicineCard> {
           child: Opacity(
             opacity: isFullyFinished ? 0.85 : 1.0,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
               child: Row(
                 children: [
                   // Premium Layered Icon
-                  Container(
-                    width: 48,
-                    height: 48,
+                    Container(
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       shape: BoxShape.circle,
@@ -115,8 +115,8 @@ class _MedicineCardState extends State<MedicineCard> {
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 38,
-                          height: 38,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -124,8 +124,8 @@ class _MedicineCardState extends State<MedicineCard> {
                           ),
                         ),
                         Container(
-                          width: 32,
-                          height: 32,
+                          width: 26,
+                          height: 26,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Theme.of(context).cardColor,
@@ -137,7 +137,7 @@ class _MedicineCardState extends State<MedicineCard> {
                                   child: MedicineUtils.buildTypeIcon(
                                     context, 
                                     widget.medicine.type, 
-                                    size: 18,
+                                    size: 16,
                                     color: Theme.of(context).primaryColor,
                                   ),
                                 ),
@@ -155,14 +155,14 @@ class _MedicineCardState extends State<MedicineCard> {
                               child: const Icon(
                                 Icons.check_circle,
                                 color: AppTheme.successColor,
-                                size: 16,
+                                size: 14,
                               ),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
       
                   // Info
                   Expanded(
@@ -178,9 +178,9 @@ class _MedicineCardState extends State<MedicineCard> {
                                 widget.medicine.name,
                                 style: TextStyle(
                                    fontWeight: FontWeight.w700,
-                                   fontSize: 15,
+                                   fontSize: 14,
                                    color: AppTheme.textPrimary,
-                                   letterSpacing: -0.3,
+                                   letterSpacing: -0.2,
                                 ),
                               ),
                             ),
@@ -211,10 +211,7 @@ class _MedicineCardState extends State<MedicineCard> {
                             final time = MedicineUtils.parseTime(timeSlot);
                             if (time == null) return const SizedBox.shrink();
                             
-                            // New Logic: 
-                            // 1. Visual: If time passed -> Green.
-                            // 2. Interaction: User cannot toggle from card (Read-only).
-                            
+                            // Only show as done (green) if user explicitly marked it as taken OR time has passed
                             bool isTaken = widget.medicine.isSlotTaken(targetDay, timeSlot);
 
                             final scheduledDateTime = DateTime(targetDay.year, targetDay.month, targetDay.day, time.hour, time.minute);
@@ -226,33 +223,25 @@ class _MedicineCardState extends State<MedicineCard> {
                             final colonIndex = timeSlot.indexOf(':');
                             final timeText = colonIndex != -1 ? timeSlot.substring(colonIndex + 1).trim() : timeSlot;
                             
+                            
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: isDone
-                                    ? AppTheme.successColor.withValues(alpha: 0.15)
+                                    ? AppTheme.successColor.withValues(alpha: 0.2)
                                     : Theme.of(context).primaryColor.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(8),
-                                border: isDone ? Border.all(color: AppTheme.successColor.withValues(alpha: 0.5), width: 1) : null,
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isDone) ...[
-                                    Icon(Icons.check, size: 12, color: AppTheme.successColor),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  Text(
-                                    timeText,
-                                    style: TextStyle(
-                                      color: isDone 
-                                          ? AppTheme.successColor 
-                                          : Theme.of(context).primaryColor,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                timeText,
+                                style: TextStyle(
+                                  color: isDone 
+                                      ? AppTheme.successColor 
+                                      : Theme.of(context).primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -285,30 +274,24 @@ class _MedicineCardState extends State<MedicineCard> {
   
                             if (remaining == null) return const SizedBox.shrink();
   
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                      shape: BoxShape.circle,
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.alarm, size: 12, color: Theme.of(context).primaryColor),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Next in ${MedicineUtils.formatDuration(remaining)}',
+                                      style: TextStyle(
+                                        color: Theme.of(context).primaryColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  child: Icon(Icons.alarm, size: 10, color: Theme.of(context).primaryColor),
+                                  ],
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Next in ${MedicineUtils.formatDuration(remaining)}',
-                                  style: TextStyle(
-                                    color: Theme.of(context).primaryColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                ],
-                              ),
-                            );
+                              );
                           }
                         ),
                       ],
