@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:medi/screens/add_medicine_screen.dart';
 import 'package:medi/screens/home_screen.dart';
@@ -44,9 +43,19 @@ class _MainScreenState extends State<MainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.grid_view_rounded, 'Schedule'),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 15),
+                    child: Center(child: _buildNavItem(0, Icons.grid_view_rounded, 'Schedule')),
+                  ),
+                ),
                 _buildAddButton(),
-                _buildNavItem(2, Icons.delete_outline_rounded, 'Trash'),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 15),
+                    child: Center(child: _buildNavItem(2, Icons.delete_outline_rounded, 'Trash')),
+                  ),
+                ),
               ],
             ),
           ),

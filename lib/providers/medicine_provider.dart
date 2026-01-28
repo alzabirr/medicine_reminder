@@ -3,6 +3,7 @@ import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
@@ -14,7 +15,7 @@ class MedicineProvider extends ChangeNotifier {
 
   Map<String, String> _userProfile = {
     'name': 'User Name',
-    'email': 'user@example.com',
+    'avatar': 'assets/avatar/Aven.jpg', // Default avatar
   };
   Map<String, String> get userProfile => _userProfile;
 
@@ -31,12 +32,385 @@ class MedicineProvider extends ChangeNotifier {
     await _databaseService.init();
     await _notificationService.init();
     await loadMedicines();
+    await _loadProfile();
     
     // Initial schedule refresh on app startup
     await refreshAllSchedules();
     
     _isLoading = false;
     notifyListeners();
+  }
+
+  Map<String, dynamic> getAdherenceStats() {
+    int totalScheduled = 0;
+    int totalTaken = 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    for (var medicine in activeMedicines) {
+      final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+      final end = medicine.endDate != null 
+          ? DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day)
+          : today;
+      
+      final reportEnd = end.isBefore(today) ? end : today;
+      
+      if (reportEnd.isBefore(start)) continue;
+
+      final daysCount = reportEnd.difference(start).inDays + 1;
+      
+      int mScheduled = 0;
+      for (int i = 0; i < daysCount; i++) {
+        final currentDate = start.add(Duration(days: i));
+        final isToday = currentDate.year == today.year && currentDate.month == today.month && currentDate.day == today.day;
+        
+        bool isDoseDay = false;
+        if (medicine.interval == 1) isDoseDay = true;
+        else if (medicine.interval == 7) isDoseDay = currentDate.weekday == start.weekday;
+        else isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+
+        if (isDoseDay) {
+          for (var slot in medicine.timeSlots) {
+            if (isToday) {
+              // Only count if slot time has passed
+              final slotTime = _parseSlotTime(slot);
+              if (slotTime != null) {
+                final scheduledDT = DateTime(today.year, today.month, today.day, slotTime.hour, slotTime.minute);
+                if (now.isAfter(scheduledDT)) mScheduled++;
+              }
+            } else {
+              mScheduled++;
+            }
+          }
+        }
+      }
+      
+      totalScheduled += mScheduled;
+      totalTaken += medicine.takenHistory.where((dt) {
+        final d = DateTime(dt.year, dt.month, dt.day);
+        return (d.isAtSameMomentAs(start) || d.isAfter(start)) && 
+               (d.isAtSameMomentAs(reportEnd) || d.isBefore(reportEnd));
+      }).length;
+    }
+
+    final double percentage = totalScheduled > 0 ? (totalTaken / totalScheduled) * 100 : 100.0;
+
+    return {
+      'totalScheduled': totalScheduled,
+      'totalTaken': totalTaken,
+      'percentage': percentage.clamp(0.0, 100.0),
+    };
+  }
+
+  TimeOfDay? _parseSlotTime(String slot) {
+    final pivotIndex = slot.indexOf(':');
+    if (pivotIndex == -1) return null;
+    final timeStr = slot.substring(pivotIndex + 1).trim();
+    final RegExp timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
+    final match = timeRegex.firstMatch(timeStr);
+    if (match != null) {
+      int h = int.parse(match.group(1)!);
+      int m = int.parse(match.group(2)!);
+      final period = match.group(3)?.toLowerCase();
+      if (period == 'pm' && h != 12) h += 12;
+      if (period == 'am' && h == 12) h = 0;
+      return TimeOfDay(hour: h, minute: m);
+    }
+    return null;
+  }
+
+  Map<String, dynamic> getAdvancedAnalytics() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // 1. Weekly Trend (Last 7 days)
+    List<Map<String, dynamic>> weeklyTrend = [];
+    for (int i = 6; i >= 0; i--) {
+      final targetDate = today.subtract(Duration(days: i));
+      int dayScheduled = 0;
+      int dayTaken = 0;
+
+      for (var medicine in activeMedicines) {
+        final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+        final end = medicine.endDate != null 
+            ? DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day)
+            : null;
+
+        if (targetDate.isBefore(start)) continue;
+        if (end != null && targetDate.isAfter(end)) continue;
+
+        bool isDoseDay = false;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = targetDate.weekday == start.weekday;
+        } else {
+          isDoseDay = targetDate.difference(start).inDays % medicine.interval == 0;
+        }
+
+        if (isDoseDay) {
+          dayScheduled += medicine.timeSlots.length;
+          dayTaken += medicine.takenHistory.where((dt) {
+            return dt.year == targetDate.year && dt.month == targetDate.month && dt.day == targetDate.day;
+          }).length;
+        }
+      }
+
+      final double percentage = dayScheduled > 0 ? (dayTaken / dayScheduled) * 100 : 100.0;
+      weeklyTrend.add({
+        'date': targetDate,
+        'percentage': percentage.clamp(0.0, 100.0),
+      });
+    }
+
+    // 2. Streaks
+    int currentStreak = 0;
+    int bestStreak = 0;
+    int tempStreak = 0;
+    
+    // Count backwards from yesterday for current streak
+    // Today might be partial, so we check if today is fully taken or still in progress
+    bool checkedToday = false;
+    
+    // Simple streak logic: check each day starting from today backwards
+    for (int i = 0; ; i++) {
+      final targetDate = today.subtract(Duration(days: i));
+      int dayScheduled = 0;
+      int dayTaken = 0;
+      bool hasActiveMeds = false;
+
+      for (var medicine in activeMedicines) {
+        final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+        final end = medicine.endDate != null 
+            ? DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day)
+            : null;
+
+        if (targetDate.isBefore(start)) continue;
+        if (end != null && targetDate.isAfter(end)) continue;
+        
+        hasActiveMeds = true;
+
+        bool isDoseDay = false;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = targetDate.weekday == start.weekday;
+        } else {
+          isDoseDay = targetDate.difference(start).inDays % medicine.interval == 0;
+        }
+
+        if (isDoseDay) {
+          dayScheduled += medicine.timeSlots.length;
+          dayTaken += medicine.takenHistory.where((dt) {
+            return dt.year == targetDate.year && dt.month == targetDate.month && dt.day == targetDate.day;
+          }).length;
+        }
+      }
+
+      if (!hasActiveMeds && i > 0) break; // End of history
+      if (!hasActiveMeds && i == 0) continue; // Skip today if no meds scheduled
+
+      if (dayScheduled > 0 && dayTaken >= dayScheduled) {
+        tempStreak++;
+        if (i == 0 || (i > 0 && currentStreak == i)) {
+           currentStreak = tempStreak;
+        }
+      } else if (dayScheduled > 0) {
+        if (i == 0) {
+          // Today not finished, don't break streak yet if yesterday was good
+          continue;
+        }
+        break; // Streak broken
+      } else if (i > 0 && dayScheduled == 0) {
+          // No meds scheduled on this day, streak continues
+          tempStreak++;
+          if (currentStreak == i) currentStreak++;
+      }
+      
+      if (tempStreak > bestStreak) bestStreak = tempStreak;
+      if (i > 365) break; // Safety limit
+    }
+
+    // 3. Medicine Breakdown
+    List<Map<String, dynamic>> medicineStats = [];
+    int totalDosesEvaluated = 0;
+    int onTimeDoses = 0;
+
+    for (var medicine in activeMedicines) {
+      final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+      final daysCount = today.difference(start).inDays + 1;
+      
+      int mScheduled = 0;
+      for (int i = 0; i < daysCount; i++) {
+        final currentDate = start.add(Duration(days: i));
+        final isToday = currentDate.year == today.year && currentDate.month == today.month && currentDate.day == today.day;
+        
+        bool isDoseDay = false;
+        if (medicine.interval == 1) isDoseDay = true;
+        else if (medicine.interval == 7) isDoseDay = currentDate.weekday == start.weekday;
+        else isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+
+        if (isDoseDay) {
+          for (var slot in medicine.timeSlots) {
+            if (isToday) {
+              final slotTime = _parseSlotTime(slot);
+              if (slotTime != null) {
+                final scheduledDT = DateTime(today.year, today.month, today.day, slotTime.hour, slotTime.minute);
+                if (now.isAfter(scheduledDT)) mScheduled++;
+              }
+            } else {
+              mScheduled++;
+            }
+          }
+        }
+      }
+
+      int mTaken = medicine.takenHistory.where((dt) {
+        final d = DateTime(dt.year, dt.month, dt.day);
+        return !d.isBefore(start) && !d.isAfter(today);
+      }).length;
+
+      // 4. Time Accuracy (Was it taken within 30 mins?)
+      for (var takenDate in medicine.takenHistory) {
+        // Find corresponding slot
+        for (var slot in medicine.timeSlots) {
+          final slotTime = _parseSlotTime(slot);
+          if (slotTime != null) {
+            final scheduledToday = DateTime(takenDate.year, takenDate.month, takenDate.day, slotTime.hour, slotTime.minute);
+            final diff = takenDate.difference(scheduledToday).inMinutes.abs();
+            if (diff <= 30) {
+              onTimeDoses++;
+              break; 
+            }
+          }
+        }
+      }
+      totalDosesEvaluated += mTaken;
+
+      medicineStats.add({
+        'name': medicine.name,
+        'percentage': mScheduled > 0 ? (mTaken / mScheduled) * 100 : 100.0,
+        'taken': mTaken,
+        'scheduled': mScheduled,
+      });
+    }
+
+    // 5. Activity Log (Last 10 events)
+    List<Map<String, dynamic>> activityLog = [];
+    for (var medicine in activeMedicines) {
+      for (var dt in medicine.takenHistory) {
+        activityLog.add({
+          'name': medicine.name,
+          'time': dt,
+          'type': 'taken',
+        });
+      }
+    }
+    activityLog.sort((a, b) => (b['time'] as DateTime).compareTo(a['time'] as DateTime));
+    activityLog = activityLog.take(10).toList();
+
+    // 6. Rank Logic
+    final overallAdherence = getAdherenceStats()['percentage'];
+    String rank = 'Bronze';
+    if (overallAdherence >= 95) rank = 'Platinum';
+    else if (overallAdherence >= 85) rank = 'Gold';
+    else if (overallAdherence >= 70) rank = 'Silver';
+
+    // 7. Time of Day Analysis
+    Map<String, int> takenBySlot = {'Morning': 0, 'Noon': 0, 'Night': 0};
+    int totalTakenDoses = 0;
+    for (var medicine in activeMedicines) {
+      for (var dt in medicine.takenHistory) {
+        totalTakenDoses++;
+        if (dt.hour >= 5 && dt.hour < 12) takenBySlot['Morning'] = takenBySlot['Morning']! + 1;
+        else if (dt.hour >= 12 && dt.hour < 17) takenBySlot['Noon'] = takenBySlot['Noon']! + 1;
+        else if (dt.hour >= 17 || dt.hour < 5) takenBySlot['Night'] = takenBySlot['Night']! + 1;
+      }
+    }
+    String bestTime = 'None';
+    int maxTaken = 0;
+    takenBySlot.forEach((k, v) {
+      if (v > maxTaken) {
+        maxTaken = v;
+        bestTime = k;
+      }
+    });
+
+    // 8. XP & Level System
+    int totalXP = totalTakenDoses * 10;
+    int level = (totalXP / 100).floor() + 1;
+    double levelProgress = (totalXP % 100) / 100;
+
+    // 9. Monthly Heatmap (Last 30 days)
+    List<double> monthlyHeatmap = [];
+    for (int i = 29; i >= 0; i--) {
+      final date = today.subtract(Duration(days: i));
+      int scheduled = 0;
+      int taken = 0;
+      
+      for (var med in activeMedicines) {
+        final start = DateTime(med.startTime.year, med.startTime.month, med.startTime.day);
+        if (date.isBefore(start)) continue;
+
+        bool isDoseDay = false;
+        if (med.interval == 1) isDoseDay = true;
+        else if (med.interval == 7) isDoseDay = date.weekday == start.weekday;
+        else isDoseDay = date.difference(start).inDays % med.interval == 0;
+
+        if (isDoseDay) {
+          scheduled += med.timeSlots.length;
+          taken += med.takenHistory.where((dt) => dt.year == date.year && dt.month == date.month && dt.day == date.day).length;
+        }
+      }
+      monthlyHeatmap.add(scheduled > 0 ? (taken / scheduled).clamp(0.0, 1.0) : 1.0);
+    }
+
+    // 10. Weekly Comparison
+    double lastWeekAdherence = 0;
+    int lwScheduled = 0;
+    int lwTaken = 0;
+    for (int i = 13; i >= 7; i--) {
+       final date = today.subtract(Duration(days: i));
+       for (var med in activeMedicines) {
+          final start = DateTime(med.startTime.year, med.startTime.month, med.startTime.day);
+          if (date.isBefore(start)) continue;
+          bool isDoseDay = false;
+          if (med.interval == 1) isDoseDay = true;
+          else if (med.interval == 7) isDoseDay = date.weekday == start.weekday;
+          else isDoseDay = date.difference(start).inDays % med.interval == 0;
+          if (isDoseDay) {
+            lwScheduled += med.timeSlots.length;
+            lwTaken += med.takenHistory.where((dt) => dt.year == date.year && dt.month == date.month && dt.day == date.day).length;
+          }
+       }
+    }
+    lastWeekAdherence = lwScheduled > 0 ? (lwTaken / lwScheduled) * 100 : 100.0;
+    double comparison = overallAdherence - lastWeekAdherence;
+
+    // 11. Achievements
+    List<Map<String, dynamic>> achievements = [
+      {'title': 'Alpha', 'icon': Icons.bolt_rounded, 'unlocked': totalTakenDoses >= 1},
+      {'title': 'Consistent', 'icon': Icons.calendar_today_rounded, 'unlocked': currentStreak >= 3},
+      {'title': 'Master', 'icon': Icons.emoji_events_rounded, 'unlocked': currentStreak >= 7},
+      {'title': 'Punctual', 'icon': Icons.timer_rounded, 'unlocked': (totalDosesEvaluated > 0 ? (onTimeDoses / totalDosesEvaluated) * 100 : 0) >= 90},
+    ];
+
+    return {
+      'weeklyTrend': weeklyTrend,
+      'currentStreak': currentStreak,
+      'bestStreak': bestStreak,
+      'medicineStats': medicineStats,
+      'timeAccuracy': totalDosesEvaluated > 0 ? (onTimeDoses / totalDosesEvaluated) * 100 : 100.0,
+      'activityLog': activityLog,
+      'rank': rank,
+      'bestTime': bestTime,
+      'totalXP': totalXP,
+      'level': level,
+      'levelProgress': levelProgress,
+      'heatmap': monthlyHeatmap,
+      'comparison': comparison,
+      'achievements': achievements,
+    };
   }
 
   Future<void> loadMedicines() async {
@@ -388,9 +762,26 @@ class MedicineProvider extends ChangeNotifier {
     }
   }
 
-  void updateProfile(String name, String email) {
+  Future<void> _loadProfile() async {
+    final box = await Hive.openBox('settings');
+    final name = box.get('userName', defaultValue: 'User Name');
+    final avatar = box.get('userAvatar', defaultValue: 'assets/avatar/Aven.jpg');
+    
+    _userProfile = {
+      'name': name,
+      'avatar': avatar,
+    };
+    notifyListeners();
+  }
+
+  Future<void> updateProfile(String name, String avatar) async {
     _userProfile['name'] = name;
-    _userProfile['email'] = email;
+    _userProfile['avatar'] = avatar;
+    
+    final box = await Hive.openBox('settings');
+    await box.put('userName', name);
+    await box.put('userAvatar', avatar);
+    
     notifyListeners();
   }
 }

@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/providers/theme_provider.dart';
+import 'package:medi/screens/profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -113,62 +115,77 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildProfileSection(BuildContext context, MedicineProvider provider) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppTheme.getNeumorphicShadow(context),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              boxShadow: AppTheme.getNeumorphicShadowInset(context),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppTheme.getNeumorphicShadow(context),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                boxShadow: AppTheme.getNeumorphicShadowInset(context),
+              ),
+              child: ClipOval(
+                child: provider.userProfile['avatar']!.startsWith('assets/')
+                    ? Image.asset(
+                        provider.userProfile['avatar']!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.person_rounded, color: Theme.of(context).primaryColor, size: 32),
+                      )
+                    : Image.file(
+                        File(provider.userProfile['avatar']!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.person_rounded, color: Theme.of(context).primaryColor, size: 32),
+                      ),
+              ),
             ),
-            child: Icon(Icons.person_rounded, color: Theme.of(context).primaryColor, size: 32),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  provider.userProfile['name']!,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).textTheme.titleLarge?.color,
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    provider.userProfile['name']!,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).textTheme.titleLarge?.color,
+                    ),
                   ),
-                ),
-                Text(
-                  provider.userProfile['email']!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w500,
+                  Text(
+                    'Your Health Profile',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          GestureDetector(
-            onTap: () => _showEditProfileDialog(context, provider),
-            child: Container(
+            Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 shape: BoxShape.circle,
                 boxShadow: AppTheme.getNeumorphicShadow(context),
               ),
-              child: Icon(Icons.edit_note_rounded, color: Theme.of(context).primaryColor, size: 20),
+              child: Icon(Icons.arrow_forward_ios_rounded, color: Theme.of(context).primaryColor, size: 16),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -267,43 +284,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  void _showEditProfileDialog(BuildContext context, MedicineProvider provider) {
-    final nameController = TextEditingController(text: provider.userProfile['name']);
-    final emailController = TextEditingController(text: provider.userProfile['email']);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              provider.updateProfile(nameController.text, emailController.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900)),
-          ),
-        ],
       ),
     );
   }
