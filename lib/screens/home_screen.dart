@@ -299,10 +299,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Medicines List
                     Expanded(
                       child: dailyMedicines.isEmpty
-                          ? Center(
+                          ? SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
+                                  const SizedBox(height: 60), // Top spacing to help centering
                                   Container(
                                     padding: const EdgeInsets.all(32),
                                     decoration: BoxDecoration(
@@ -310,17 +312,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                       shape: BoxShape.circle,
                                       boxShadow: AppTheme.neumorphicShadowInset,
                                     ),
-                                    child: Icon(Icons.medication_liquid_rounded, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.2)),
+                                    child: Icon(
+                                      Icons.medication_liquid_rounded, 
+                                      size: 48, 
+                                      color: AppTheme.textSecondary.withValues(alpha: 0.2)
+                                    ),
                                   ),
                                   const SizedBox(height: 24),
                                   Text(
-                                    'No medications for today',
+                                    'No medicines for today',
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textSecondary.withValues(alpha: 0.4),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary.withValues(alpha: 0.6),
                                     ),
                                   ),
+                                  const SizedBox(height: 180), // Kept high as requested
                                 ],
                               ),
                             )

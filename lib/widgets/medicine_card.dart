@@ -211,18 +211,14 @@ class _MedicineCardState extends State<MedicineCard> {
                             final time = MedicineUtils.parseTime(timeSlot);
                             if (time == null) return const SizedBox.shrink();
                             
-                            // Only show as done (green) if user explicitly marked it as taken OR time has passed
                             bool isTaken = widget.medicine.isSlotTaken(targetDay, timeSlot);
 
                             final scheduledDateTime = DateTime(targetDay.year, targetDay.month, targetDay.day, time.hour, time.minute);
                             final isPassed = scheduledDateTime.isBefore(now);
-                            
-                            // Visual State
-                            final isDone = isTaken || isPassed; // Green if taken OR passed (Auto-green)
+                            final isDone = isTaken || isPassed;
                             
                             final colonIndex = timeSlot.indexOf(':');
                             final timeText = colonIndex != -1 ? timeSlot.substring(colonIndex + 1).trim() : timeSlot;
-                            
                             
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -231,6 +227,7 @@ class _MedicineCardState extends State<MedicineCard> {
                                     ? AppTheme.successColor.withValues(alpha: 0.2)
                                     : Theme.of(context).primaryColor.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(10),
+                                border: isTaken ? Border.all(color: AppTheme.successColor.withOpacity(0.5), width: 1) : null,
                               ),
                               child: Text(
                                 timeText,

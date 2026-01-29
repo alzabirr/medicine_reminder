@@ -101,7 +101,7 @@ class _MedicineReminderAppState extends State<MedicineReminderApp> with WidgetsB
        
       navigatorKey: NotificationService.navigatorKey,
       restorationScopeId: 'medi_app',
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.getTheme(customPrimary: themeProvider.accentColor),
       darkTheme: ThemeData.dark().copyWith(
         primaryColor: AppTheme.primaryColor,
         colorScheme: ColorScheme.fromSeed(seedColor: AppTheme.primaryColor, brightness: Brightness.dark),

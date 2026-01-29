@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/providers/theme_provider.dart';
 import 'package:medi/screens/profile_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -39,18 +40,8 @@ class SettingsScreen extends StatelessWidget {
                       onChanged: (val) => medProvider.toggleNotifications(),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildSettingItem(
-                    context,
-                    icon: Icons.dark_mode_outlined,
-                    title: 'Dark Mode',
-                    subtitle: themeProvider.isDarkMode ? 'Dark theme active' : 'Light theme active',
-                    trailing: Switch.adaptive(
-                      value: themeProvider.isDarkMode,
-                      activeColor: Theme.of(context).primaryColor,
-                      onChanged: (val) => themeProvider.toggleTheme(val),
-                    ),
-                  ),
+
+
                   const SizedBox(height: 32),
                   _buildSectionLabel('App Settings'),
                   const SizedBox(height: 16),
@@ -73,12 +64,33 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingItem(
                     context,
                     icon: Icons.info_outline_rounded,
-                    onTap: () => _showInfoDialog(context, 'About', 'MediRemind v1.0.0 \n\nDesigned for your health. \nCreated with Flutter.'),
-                    title: 'About',
-                    subtitle: 'Version 1.0.0',
+                    onTap: () => _showInfoDialog(
+                      context, 
+                      'About MediRemind', 
+                      'MediRemind is your personal healthcare companion, designed to help you stay consistent with your medications. \n\n🔒 Privacy First: All your health data remains stored locally on your device. \n\n✨ Goal: To provide a premium, easy-to-use experience for better health management. '
+                    ),
+                    title: 'About MediRemind',
+                    subtitle: 'Mission, Privacy & Mission',
                   ),
-                  const SizedBox(height: 40),
-                  _buildLogoutButton(context),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('Personalization'),
+                  const SizedBox(height: 16),
+                  _buildSettingItem(
+                    context,
+                    icon: Icons.palette_outlined,
+                    onTap: () => _showColorPickerSheet(context, themeProvider),
+                    title: 'Accent Color',
+                    subtitle: 'Current: ${themeProvider.accentColor.value.toRadixString(16).toUpperCase().substring(2)}',
+                    trailing: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: themeProvider.accentColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -259,34 +271,138 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mock Logout: You session is active')),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        height: 60,
+  void _showColorPickerSheet(BuildContext context, ThemeProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 40, offset: const Offset(0, -10)),
+          ],
         ),
-        child: const Center(
-          child: Text(
-            'Sign Out',
-            style: TextStyle(
-              color: Colors.red,
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Signature Color',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 24),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select wait suits your style best',
+              style: GoogleFonts.outfit(
+                color: AppTheme.textSecondary.withOpacity(0.6),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 32),
+            _buildColorGrid(context, provider),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildColorGrid(BuildContext context, ThemeProvider provider) {
+    final List<Map<String, dynamic>> colors = [
+     
+     // Custom Colors
+      {'color': const Color(0xFFD02752), 'name': 'Crimson'},
+      {'color': const Color(0xFF8A244B), 'name': 'Maroon'},
+      {'color': const Color(0xFF111F35), 'name': 'Midnight Blue'},
+      {'color': const Color(0xFF30364F), 'name': 'Deep Navy'},
+      {'color': const Color(0xFF36656B), 'name': 'Teal Blue'},
+      {'color': const Color(0xFF628141), 'name': 'Olive Green'},
+      {'color': const Color(0xFF6F8F72), 'name': 'Sage Green'},
+      {'color': const Color(0xFFB12C00), 'name': 'Burnt Orange'},
+      {'color': const Color(0xFF6A1E55), 'name': 'Plum'},
+      {'color': const Color(0xFFFF204E), 'name': 'Flash Pink'},
+      {'color': const Color(0xFF009688), 'name': 'Teal'},
+      {'color': const Color(0xFF06B6D4), 'name': 'Cyan'},
+      {'color': const Color(0xFF03A9F4), 'name': 'Light Blue'},
+      {'color': const Color(0xFF2196F3), 'name': 'Blue'},
+      {'color': const Color(0xFF64748B), 'name': 'Slate'},
+      {'color': const Color(0xFF71717A), 'name': 'Zinc'},
+      {'color': const Color(0xFF78716C), 'name': 'Stone'},
+      {'color': const Color(0xFF795548), 'name': 'Brown'},
+      {'color': const Color(0xFF455A64), 'name': 'Blue Grey'},
+      
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: colors.length,
+      itemBuilder: (context, index) {
+        final colorData = colors[index];
+        final Color color = colorData['color'];
+        final isSelected = provider.accentColor.value == color.value;
+
+        return GestureDetector(
+          onTap: () => provider.setAccentColor(color),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withOpacity(0.8)],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? Colors.white : Colors.transparent,
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: isSelected
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
 
   void _showInfoDialog(BuildContext context, String title, String message) {
     showDialog(

@@ -4,7 +4,9 @@ import 'package:medi/core/theme.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:medi/widgets/report/daily_report_sheet.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,9 +17,14 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
+  late TextEditingController _weightController;
+  late TextEditingController _allergiesController;
   late String _selectedAvatar;
+  String? _selectedBloodGroup;
   bool _isEditing = false;
   final ImagePicker _picker = ImagePicker();
+
+  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   final List<String> _avatarAssets = [
     'assets/avatar/Aven.jpg',
@@ -41,18 +48,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     final provider = Provider.of<MedicineProvider>(context, listen: false);
     _nameController = TextEditingController(text: provider.userProfile['name']);
+    _weightController = TextEditingController(text: provider.userProfile['weight'] == '—' ? '' : provider.userProfile['weight']);
+    _allergiesController = TextEditingController(text: provider.userProfile['allergies'] == 'None' ? '' : provider.userProfile['allergies']);
     _selectedAvatar = provider.userProfile['avatar']!;
+    _selectedBloodGroup = provider.userProfile['bloodGroup'] == 'Select' ? null : provider.userProfile['bloodGroup'];
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _weightController.dispose();
+    _allergiesController.dispose();
     super.dispose();
   }
 
   void _saveProfile() {
     final provider = Provider.of<MedicineProvider>(context, listen: false);
-    provider.updateProfile(_nameController.text, _selectedAvatar);
+    provider.updateProfile(
+      name: _nameController.text,
+      avatar: _selectedAvatar,
+      bloodGroup: _selectedBloodGroup ?? 'Select',
+      weight: _weightController.text.isEmpty ? '—' : _weightController.text,
+      allergies: _allergiesController.text.isEmpty ? 'None' : _allergiesController.text,
+    );
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile updated successfully!')),
@@ -127,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
+                 Center(
                   child: Column(
                     children: [
                       _buildAvatarSection(),
@@ -136,19 +154,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 40),
-                
-                _buildSectionHeader('Overall Performance'),
-                const SizedBox(height: 16),
-                _buildHealthReportSection(stats, advanced['timeAccuracy'], advanced['comparison']),
-                
                 const SizedBox(height: 32),
-                _buildSectionHeader('30-Day Activity Heatmap'),
+                
+                if (!_isEditing) _buildInfoGrid(provider.userProfile),
+                if (_isEditing) _buildEditHealthDetails(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Overall Adherence Breakdown'),
                 const SizedBox(height: 16),
-                _buildMonthlyHeatmap(advanced['heatmap']),
+                _buildAdherencePieChart(provider.getActiveDaysHistory()),
 
                 const SizedBox(height: 32),
-                _buildSectionHeader('Weekly Trend'),
+                _buildSectionHeader('Adherence History Trend'),
                 const SizedBox(height: 16),
                 _buildTrendChart(advanced['weeklyTrend']),
                 
@@ -166,6 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
@@ -178,69 +195,120 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildTrendChart(List<Map<String, dynamic>> trend) {
+    if (trend.isEmpty) return const SizedBox.shrink();
+    
     return Container(
-      height: 200,
-      padding: const EdgeInsets.all(20),
+      height: 240,
+      padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: AppTheme.getNeumorphicShadow(context),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: trend.map((day) {
-          final double percentage = day['percentage'];
-          final DateTime date = day['date'];
-          final isToday = date.day == DateTime.now().day;
+      child: Stack(
+        children: [
+          // Background guidelines
+          Padding(
+            padding: const EdgeInsets.only(top: 45, bottom: 55, left: 24, right: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(height: 1, color: AppTheme.textSecondary.withValues(alpha: 0.05)),
+                Container(height: 1, color: AppTheme.textSecondary.withValues(alpha: 0.05)),
+                Container(height: 1, color: AppTheme.textSecondary.withValues(alpha: 0.1)),
+              ],
+            ),
+          ),
+          
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: trend.reversed.map((day) {
+                final double percentage = day['percentage'];
+                final DateTime date = day['date'];
+                final isToday = date.year == DateTime.now().year && 
+                                date.month == DateTime.now().month && 
+                                date.day == DateTime.now().day;
 
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                '${percentage.toInt()}%',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: isToday ? Theme.of(context).primaryColor : AppTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 500),
-                width: 25,
-                height: (percentage / 100) * 100,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).primaryColor,
-                      Theme.of(context).primaryColor.withOpacity(0.5),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).primaryColor.withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                Color barColor;
+                if (percentage >= 100) barColor = AppTheme.successColor;
+                else if (percentage >= 50) barColor = Colors.orange;
+                else barColor = Colors.indigoAccent;
+
+                return GestureDetector(
+                  onTap: () => _showDailyReport(date),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          percentage >= 100 ? '✓' : '${percentage.toInt()}%',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: isToday ? Theme.of(context).primaryColor : barColor.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            // Empty track
+                            Container(
+                              width: 18,
+                              height: 110,
+                              decoration: BoxDecoration(
+                                color: AppTheme.textSecondary.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            // Animated bar
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.0, end: percentage),
+                              duration: const Duration(milliseconds: 1000),
+                              curve: Curves.easeOutQuart,
+                              builder: (context, value, child) => Container(
+                                width: 18,
+                                height: (value / 100) * 110,
+                                decoration: BoxDecoration(
+                                  color: barColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          DateFormat('E').format(date).toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: isToday ? FontWeight.w900 : FontWeight.w700,
+                            color: isToday ? Theme.of(context).primaryColor : AppTheme.textSecondary.withValues(alpha: 0.8),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          DateFormat('d/M').format(date),
+                          style: GoogleFonts.outfit(
+                            fontSize: 9,
+                            fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                            color: isToday ? Theme.of(context).primaryColor.withValues(alpha: 0.7) : AppTheme.textSecondary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ['M', 'T', 'W', 'T', 'F', 'S', 'S'][date.weekday - 1],
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isToday ? FontWeight.w900 : FontWeight.w500,
-                  color: isToday ? Theme.of(context).primaryColor : AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          );
-        }).toList(),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -252,37 +320,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     return Column(
       children: [
-        GestureDetector(
-          onTap: () {
-            setState(() => _isEditing = true);
-            _showImageSourceSheet();
-          },
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Theme.of(context).cardColor,
-                  border: Border.all(
-                    color: _isEditing ? Theme.of(context).primaryColor : Colors.transparent,
-                    width: 4,
-                  ),
-                  boxShadow: AppTheme.getNeumorphicShadow(context),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).cardColor,
+                border: Border.all(
+                  color: _isEditing ? Theme.of(context).primaryColor : Colors.transparent,
+                  width: 4,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ClipOval(
-                    child: isAsset 
-                      ? Image.asset(_selectedAvatar, fit: BoxFit.cover)
-                      : Image.file(File(_selectedAvatar), fit: BoxFit.cover),
+                boxShadow: AppTheme.getNeumorphicShadow(context),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ClipOval(
+                  child: isAsset 
+                    ? Image.asset(_selectedAvatar, fit: BoxFit.cover)
+                    : Image.file(File(_selectedAvatar), fit: BoxFit.cover),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _isEditing = true);
+                  _showImageSourceSheet();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).primaryColor,
+                        Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 3,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.edit_rounded,
+                    color: Colors.white,
+                    size: 16,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -480,46 +582,627 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildMonthlyHeatmap(List<double> data) {
+
+  Widget _buildAdherencePieChart(List<Map<String, dynamic>> history) {
+    if (history.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        decoration: BoxDecoration(
+           color: Theme.of(context).cardColor,
+           borderRadius: BorderRadius.circular(24),
+           boxShadow: AppTheme.getNeumorphicShadow(context),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.pie_chart_outline_rounded, size: 48, color: AppTheme.textSecondary.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(
+              'No activity recorded yet.',
+              style: GoogleFonts.outfit(color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    int perfect = 0;
+    int struggling = 0;
+    int totalTakenDoses = 0;
+    int totalScheduledDoses = 0;
+
+    for (var day in history) {
+      totalTakenDoses += (day['taken'] as int? ?? 0);
+      totalScheduledDoses += (day['scheduled'] as int? ?? 0);
+      
+      final double p = day['percentage'] ?? 0.0;
+      if (p >= 1.0) perfect++;
+      else struggling++;
+    }
+
+    final int totalDays = history.length;
+    final double overallAdherence = totalScheduledDoses > 0 ? (totalTakenDoses / totalScheduledDoses) : 0.0;
+
+    return GestureDetector(
+      onTap: () => _showHistoryLogSheet(history),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: AppTheme.getNeumorphicShadow(context),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+              SizedBox(
+                width: 150,
+                height: 150,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 1200),
+                      curve: Curves.elasticOut,
+                      builder: (context, value, child) {
+                        return CustomPaint(
+                          size: const Size(150, 150),
+                          painter: PieChartPainter(
+                            perfect: totalDays > 0 ? (perfect / totalDays) * value : 0.0,
+                            partial: 0.0,
+                            struggling: totalDays > 0 ? (struggling / totalDays) * value : 0.0,
+                            colors: [AppTheme.successColor, Colors.orange, Colors.indigoAccent],
+                            backgroundColor: Theme.of(context).cardColor,
+                          ),
+                        );
+                      },
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${(overallAdherence * 100).toInt()}%',
+                          style: GoogleFonts.outfit(
+                            fontSize: 28, 
+                            fontWeight: FontWeight.w900, 
+                            color: AppTheme.successColor,
+                            height: 1,
+                          ),
+                        ),
+                        Text(
+                          'Adherence',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10, 
+                            color: AppTheme.textSecondary, 
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 32),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildLegendItem('Completed day', perfect, totalDays, AppTheme.successColor),
+                    const SizedBox(height: 12),
+                    _buildLegendItem('Upcoming day', struggling, totalDays, Colors.indigoAccent),
+                  ],
+                ),
+              ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Based on $totalDays days of history',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.touch_app_rounded, size: 14, color: Theme.of(context).primaryColor),
+                Text(
+                  ' Tap for details',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: Theme.of(context).primaryColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, int count, int total, Color color) {
+    final double percentage = total > 0 ? (count / total) * 100 : 0.0;
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                '${percentage.toInt()}% of history',
+                style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          count.toString(),
+          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: color),
+        ),
+      ],
+    );
+  }
+  
+  void _showHistoryLogSheet(List<Map<String, dynamic>> history) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(44)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppTheme.textSecondary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Activity History',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w900, 
+                            fontSize: 26,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        Text(
+                          'Full track of your progress',
+                          style: GoogleFonts.outfit(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${history.length} Days',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).primaryColor,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final day = history[index];
+                    final date = day['date'] as DateTime;
+                    final percentage = day['percentage'] as double;
+                    
+                    // Month/Year header logic
+                    bool showHeader = false;
+                    if (index == 0) {
+                      showHeader = true;
+                    } else {
+                      final prevDate = history[index - 1]['date'] as DateTime;
+                      if (date.month != prevDate.month || date.year != prevDate.year) {
+                        showHeader = true;
+                      }
+                    }
+
+                    Color color;
+                    IconData icon;
+                    String status;
+                    
+                    if (percentage >= 1.0) {
+                      color = AppTheme.successColor;
+                      icon = Icons.check_circle_rounded;
+                      status = 'Completed day';
+                    } else {
+                      color = Colors.indigoAccent;
+                      icon = Icons.calendar_today_rounded;
+                      status = 'Upcoming day';
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (showHeader) ...[
+                          if (index != 0) const SizedBox(height: 32),
+                          Text(
+                            DateFormat('MMMM yyyy').format(date).toUpperCase(),
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textSecondary.withOpacity(0.4),
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showDailyReport(date);
+                          },
+                          child: IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                // Timeline line and dot
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 2,
+                                      color: AppTheme.textSecondary.withOpacity(0.05),
+                                    ),
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 20),
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).cardColor,
+                                      borderRadius: BorderRadius.circular(28),
+                                      boxShadow: AppTheme.getNeumorphicShadow(context),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                DateFormat('EEEE, d').format(date),
+                                                style: GoogleFonts.outfit(
+                                                  fontWeight: FontWeight.w800, 
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Icon(icon, size: 14, color: color),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    status,
+                                                    style: GoogleFonts.outfit(
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 13,
+                                                      color: color.withOpacity(0.8),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${(percentage * 100).toInt()}%',
+                                              style: GoogleFonts.outfit(
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 22,
+                                                color: color,
+                                                height: 1.1,
+                                              ),
+                                            ),
+                                            Text(
+                                              'SCORE',
+                                              style: GoogleFonts.outfit(
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 8,
+                                                color: AppTheme.textSecondary.withOpacity(0.3),
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDailyReport(DateTime date) {
+    final provider = Provider.of<MedicineProvider>(context, listen: false);
+    final stats = provider.getStatsForDay(date);
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        builder: (_, controller) => SingleChildScrollView(
+          controller: controller,
+          child: DailyReportSheet(stats: stats),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoGrid(Map<String, String> profile) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppTheme.getNeumorphicShadow(context),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildInfoItem(Icons.water_drop_rounded, 'Blood', profile['bloodGroup']!, Colors.redAccent),
+          _buildDivider(),
+          _buildInfoItem(Icons.monitor_weight_rounded, 'Weight', profile['weight'] == '—' ? '—' : '${profile['weight']} kg', Colors.blueAccent),
+          _buildDivider(),
+          _buildInfoItem(Icons.warning_amber_rounded, 'Allergy', profile['allergies']!, Colors.orangeAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditHealthDetails() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(32),
         boxShadow: AppTheme.getNeumorphicShadow(context),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 10,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-            ),
-            itemCount: data.length,
-            itemBuilder: (context, index) {
-              final val = data[index];
-              return Container(
-                decoration: BoxDecoration(
-                  color: val >= 1.0 
-                    ? AppTheme.successColor.withOpacity(0.8) 
-                    : (val > 0 ? Colors.orange.withOpacity(0.6) : Colors.red.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Last 30 Days Activity', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+              Icon(Icons.monitor_heart_rounded, color: Theme.of(context).primaryColor, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Health Information',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w900, 
+                  fontSize: 18,
+                  letterSpacing: -0.5,
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropDownField(
+                  'Blood Group', 
+                  _bloodGroups, 
+                  _selectedBloodGroup, 
+                  (val) => setState(() => _selectedBloodGroup = val),
+                  Icons.water_drop_rounded,
+                  Colors.redAccent,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  'Weight (kg)', 
+                  _weightController, 
+                  TextInputType.number,
+                  Icons.monitor_weight_rounded,
+                  Colors.blueAccent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            'Allergies / Conditions', 
+            _allergiesController, 
+            TextInputType.text,
+            Icons.warning_amber_rounded,
+            Colors.orangeAccent,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoItem(IconData icon, String label, String value, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color.withOpacity(0.8), size: 20),
+        const SizedBox(height: 6),
+        Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+        Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900)),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(height: 30, width: 1, color: AppTheme.textSecondary.withOpacity(0.15));
+  }
+
+  Widget _buildDropDownField(String label, List<String> items, String? value, Function(String?) onChanged, IconData icon, Color iconColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            label, 
+            style: GoogleFonts.outfit(
+              fontSize: 12, 
+              color: AppTheme.textSecondary.withValues(alpha: 0.7), 
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.textSecondary.withValues(alpha: 0.05)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: iconColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: value,
+                    isExpanded: true,
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                    hint: Text('Select', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.textSecondary.withValues(alpha: 0.4))),
+                    items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)))).toList(),
+                    onChanged: onChanged,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, TextInputType type, IconData icon, Color iconColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            label, 
+            style: GoogleFonts.outfit(
+              fontSize: 12, 
+              color: AppTheme.textSecondary.withValues(alpha: 0.7), 
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        TextField(
+          controller: controller,
+          keyboardType: type,
+          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+          decoration: InputDecoration(
+            isDense: false,
+            hintText: 'Enter $label',
+            hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppTheme.textSecondary.withValues(alpha: 0.4)),
+            fillColor: Theme.of(context).scaffoldBackgroundColor,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 40),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: AppTheme.textSecondary.withValues(alpha: 0.05)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -562,108 +1245,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildHealthReportSection(Map<String, dynamic> stats, double timeAccuracy, double comparison) {
-    final double percentage = stats['percentage'];
-    final Color statusColor = percentage > 80 ? AppTheme.successColor : (percentage > 50 ? Colors.orange : Colors.red);
+
+}
+
+class PieChartPainter extends CustomPainter {
+  final double perfect;
+  final double partial;
+  final double struggling;
+  final List<Color> colors;
+  final Color backgroundColor;
+
+  PieChartPainter({
+    required this.perfect,
+    required this.partial,
+    required this.struggling,
+    required this.colors,
+    required this.backgroundColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width / 2) - 10; // Padding for the stroke width
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 20
+      ..strokeCap = StrokeCap.round;
+
+    // Draw background track
+    paint.color = backgroundColor.withValues(alpha: 0.1);
+    // Draw a full circle if needed, or just the track
+    canvas.drawCircle(center, radius, paint);
     
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: AppTheme.getNeumorphicShadow(context),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Adherence Report',
-                style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              Icon(Icons.analytics_rounded, color: Theme.of(context).primaryColor),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 150,
-                height: 150,
-                child: CircularProgressIndicator(
-                  value: percentage / 100,
-                  strokeWidth: 12,
-                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                  strokeCap: StrokeCap.round,
-                ),
-              ),
-              Column(
-                children: [
-                  Text(
-                    '${percentage.toInt()}%',
-                    style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.w900),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        comparison >= 0 ? Icons.trending_up : Icons.trending_down,
-                        size: 14,
-                        color: comparison >= 0 ? AppTheme.successColor : Colors.red,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${comparison.abs().toInt()}%',
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: comparison >= 0 ? AppTheme.successColor : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'vs Last Week',
-                    style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('Taken', stats['totalTaken'].toString(), AppTheme.successColor),
-              _buildStatItem('Accuracy', '${timeAccuracy.toInt()}%', Colors.blue),
-              _buildStatItem('Scheduled', stats['totalScheduled'].toString(), Theme.of(context).primaryColor),
-            ],
-          ),
-        ],
-      ),
-    );
+    // Better track color (subtle shadow/inner look)
+    paint.color = Colors.grey.withValues(alpha: 0.05);
+    canvas.drawCircle(center, radius, paint);
+
+    double startAngle = -3.14159 / 2; // Start from top
+    const double gap = 0.08; // Small gap between segments
+
+    // Perfect
+    if (perfect > 0.001) {
+      paint.color = colors[0];
+      double sweepAngle = 2 * 3.14159 * perfect;
+      // Subtract small gap if multiple segments
+      if (perfect < 0.99) sweepAngle -= gap;
+      
+      canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
+      startAngle += sweepAngle + (perfect < 0.99 ? gap : 0);
+    }
+
+    // Partial
+    if (partial > 0.001) {
+      paint.color = colors[1];
+      double sweepAngle = 2 * 3.14159 * partial;
+      if (partial < 0.99) sweepAngle -= gap;
+      
+      canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
+      startAngle += sweepAngle + (partial < 0.99 ? gap : 0);
+    }
+
+    // Struggling
+    if (struggling > 0.001) {
+      paint.color = colors[2];
+      double sweepAngle = 2 * 3.14159 * struggling;
+      if (struggling < 0.99) sweepAngle -= gap;
+      
+      canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
+    }
   }
 
-
-
-
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: color),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

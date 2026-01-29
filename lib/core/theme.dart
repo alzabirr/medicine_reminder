@@ -60,15 +60,15 @@ class AppTheme {
     const BoxShadow(color: lightShadow, offset: Offset(4, 4), blurRadius: 8),
   ];
 
-  static ThemeData get lightTheme {
+  static ThemeData getTheme({Color customPrimary = primaryColor}) {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: backgroundColor,
       
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        primary: primaryColor,
+        seedColor: customPrimary,
+        primary: customPrimary,
         surface: backgroundColor,
         brightness: Brightness.light,
       ),
@@ -86,7 +86,7 @@ class AppTheme {
           fontSize: 24,
           fontWeight: FontWeight.w700,
         ),
-        iconTheme: const IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: textPrimary),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
@@ -94,21 +94,21 @@ class AppTheme {
         fillColor: surfaceColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.4)),
+        hintStyle: TextStyle(color: textSecondary.withOpacity(0.4)),
         prefixIconColor: textSecondary,
       ),
 
       snackBarTheme: SnackBarThemeData(
         backgroundColor: textPrimary,
         contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-        actionTextColor: primaryColor,
+        actionTextColor: customPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         behavior: SnackBarBehavior.floating,
       ),
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
-        indicatorColor: primaryColor.withValues(alpha: 0.1),
+        indicatorColor: customPrimary.withOpacity(0.1),
         labelTextStyle: WidgetStateProperty.all(
           GoogleFonts.outfit(color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
         ),
@@ -116,4 +116,6 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get lightTheme => getTheme();
 }

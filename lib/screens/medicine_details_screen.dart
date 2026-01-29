@@ -302,6 +302,9 @@ class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
         final pivotIndex = slot.indexOf(':');
         final label = pivotIndex != -1 ? slot.substring(0, pivotIndex).trim() : slot;
         final timeStr = pivotIndex != -1 ? slot.substring(pivotIndex + 1).trim() : '';
+        
+        // Check if taken today
+        final bool isTaken = med.isSlotTaken(DateTime.now(), slot);
 
         Color accentColor;
         IconData icon;
@@ -327,6 +330,7 @@ class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
             color: AppTheme.surfaceColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: AppTheme.neumorphicShadow,
+            border: isTaken ? Border.all(color: AppTheme.successColor.withOpacity(0.3), width: 2) : null,
           ),
           child: Row(
             children: [
@@ -334,17 +338,17 @@ class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.1),
+                  color: isTaken ? AppTheme.successColor.withOpacity(0.1) : accentColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: accentColor, size: 20),
+                child: Icon(isTaken ? Icons.check_rounded : icon, color: isTaken ? AppTheme.successColor : accentColor, size: 20),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.textPrimary)),
+                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isTaken ? AppTheme.successColor : AppTheme.textPrimary)),
                     Text(timeStr, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -356,7 +360,11 @@ class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: AppTheme.neumorphicShadowInset,
                 ),
-                child: const Icon(Icons.notifications_active_outlined, size: 16, color: AppTheme.textSecondary),
+                child: Icon(
+                  isTaken ? Icons.check_circle : Icons.notifications_active_outlined, 
+                  size: 16, 
+                  color: isTaken ? AppTheme.successColor : AppTheme.textSecondary,
+                ),
               ),
             ],
           ),
