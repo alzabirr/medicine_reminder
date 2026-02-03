@@ -155,9 +155,17 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       
-      // 3. Interval Logic (Daily default)
-      if (medicine.interval == 7) {
-        return medicine.startTime.weekday == day.weekday;
+      // 3. Interval Logic
+      final interval = medicine.interval ?? 1;
+      
+      if (interval == 1) {
+        return true; // Daily
+      } else if (interval == 7) {
+        return medicine.startTime.weekday == day.weekday; // Weekly
+      } else if (interval > 1) {
+        // Custom interval (e.g. every 2 days)
+        final daysDiff = checkDay.difference(start).inDays;
+        return daysDiff % interval == 0;
       }
       
       return true;
@@ -195,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                                  color: AppTheme.textSecondary.withOpacity(0.8),
                                   letterSpacing: 0.5,
                                 ),
                               ),

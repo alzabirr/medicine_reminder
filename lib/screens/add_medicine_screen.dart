@@ -305,7 +305,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             startDate: _startDate,
             endDate: _calculatedEndDate,
             imagePath: _image?.path,
-            frequency: 1, // Default back to daily
+            frequency: widget.medicine?.interval ?? 1,
          );
          ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Medicine Updated Successfully! 💊')),
@@ -377,7 +377,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                      duration: const Duration(milliseconds: 300),
                      padding: const EdgeInsets.all(10),
                      decoration: BoxDecoration(
-                       color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
+                       color: isSelected ? Colors.white.withOpacity(0.2) : Theme.of(context).scaffoldBackgroundColor,
                        shape: BoxShape.circle,
                      ),
                      child: MedicineUtils.buildTypeIcon(
@@ -444,7 +444,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            color: AppTheme.primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -500,7 +500,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             side: BorderSide(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                              color: AppTheme.primaryColor.withOpacity(0.2),
                             ),
                           ),
                         )).toList(),
@@ -514,7 +514,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       decoration: InputDecoration(
                         hintText: 'type your Does label',
                         hintStyle: GoogleFonts.outfit(
-                          color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                          color: AppTheme.textSecondary.withOpacity(0.5),
                         ),
                         filled: true,
                         fillColor: AppTheme.surfaceColor,
@@ -562,7 +562,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           color: AppTheme.primaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                            color: AppTheme.primaryColor.withOpacity(0.2),
                             width: 1.5,
                           ),
                         ),
@@ -585,7 +585,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                             const Spacer(),
                             Icon(
                               Icons.edit_rounded,
-                              color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                              color: AppTheme.primaryColor.withOpacity(0.5),
                               size: 20,
                             ),
                           ],
@@ -740,7 +740,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.withValues(alpha: 0.1),
+            color: isSelected ? Colors.transparent : Colors.grey.withOpacity(0.1),
             width: 1,
           ),
           boxShadow: isSelected 
@@ -753,7 +753,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Theme.of(context).scaffoldBackgroundColor,
+                color: isSelected ? Colors.white.withOpacity(0.2) : Theme.of(context).scaffoldBackgroundColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -776,7 +776,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -797,7 +797,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
   Widget _buildCustomDoseChip(DoseSlot slot, int index) {
     IconData icon = Icons.medication_rounded;
-    List<Color> gradient = [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)];
+    List<Color> gradient = [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)];
 
     return GestureDetector(
       onTap: () => _showAddDoseDialog(existingSlot: slot, index: index),
@@ -810,7 +810,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: gradient.first.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4)),
+            BoxShadow(color: gradient.first.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -822,7 +822,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                  const SizedBox(width: 14), // Spacer for balance
                  GestureDetector(
                     onTap: () => setState(() => _selectedTimeSlots.removeAt(index)),
-                    child: Icon(Icons.cancel, color: Colors.white.withValues(alpha: 0.5), size: 14),
+                    child: Icon(Icons.cancel, color: Colors.white.withOpacity(0.5), size: 14),
                  ),
               ],
             ),
@@ -837,7 +837,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             ),
             Text(
               slot.time.format(context),
-              style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600, fontSize: 9),
+              style: GoogleFonts.outfit(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w600, fontSize: 9),
             ),
           ],
         ),
@@ -861,7 +861,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           boxShadow: isSelected 
               ? [
                   BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.3),
+                    color: primaryColor.withOpacity(0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   )
@@ -874,7 +874,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.2) : primaryColor.withValues(alpha: 0.1),
+                color: isSelected ? Colors.white.withOpacity(0.2) : primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -991,7 +991,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                                       context, 
                                       'pill', 
                                       size: 40,
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                                      color: Theme.of(context).primaryColor.withOpacity(0.6),
                                     )
                                   : _image != null
                                       ? Image.file(_image!, fit: BoxFit.cover)
@@ -999,7 +999,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                                           context, 
                                           _selectedType, 
                                           size: 40,
-                                          color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                                          color: Theme.of(context).primaryColor.withOpacity(0.6),
                                         ),
                             ),
                             Positioned(
@@ -1061,7 +1061,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                        color: Theme.of(context).primaryColor.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 20),
@@ -1189,7 +1189,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                                 ),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                                  color: AppTheme.primaryColor.withOpacity(0.3),
                                   width: 1.5,
                                   strokeAlign: BorderSide.strokeAlignInside,
                                 ),
@@ -1281,7 +1281,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.8)],
+                    colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withOpacity(0.8)],
                   ),
                   borderRadius: BorderRadius.circular(22),
                 ),
@@ -1347,11 +1347,11 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: hasError ? AppTheme.errorColor.withValues(alpha: 0.5) : Colors.transparent,
+          color: hasError ? AppTheme.errorColor.withOpacity(0.5) : Colors.transparent,
           width: 2,
         ),
         boxShadow: hasError 
-          ? [BoxShadow(color: AppTheme.errorColor.withValues(alpha: 0.1), blurRadius: 8, spreadRadius: 1)]
+          ? [BoxShadow(color: AppTheme.errorColor.withOpacity(0.1), blurRadius: 8, spreadRadius: 1)]
           : AppTheme.getNeumorphicShadowInset(context),
       ),
       child: TextFormField(
@@ -1362,7 +1362,7 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
             padding: const EdgeInsets.only(left: 16, right: 10),
             child: Icon(
               Icons.medication, 
-              color: hasError ? AppTheme.errorColor : AppTheme.textSecondary.withValues(alpha: 0.5), 
+              color: hasError ? AppTheme.errorColor : AppTheme.textSecondary.withOpacity(0.5), 
               size: 20,
             ),
           ),
@@ -1372,7 +1372,7 @@ class _MedicineNameInputState extends State<_MedicineNameInput> {
           border: InputBorder.none,
           errorStyle: const TextStyle(height: 0, fontSize: 0), // Hide default error text
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
-          hintStyle: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.4)),
+          hintStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.4)),
         ),
         style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
         validator: (value) => (value == null || value.isEmpty) ? '' : null,

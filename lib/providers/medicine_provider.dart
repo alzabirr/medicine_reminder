@@ -4,6 +4,7 @@ import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:convert';
 
 class MedicineProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
@@ -12,6 +13,9 @@ class MedicineProvider extends ChangeNotifier {
   
   bool _notificationsEnabled = true;
   bool get notificationsEnabled => _notificationsEnabled;
+
+  String _notificationSound = 'default';
+  String get notificationSound => _notificationSound;
 
   Map<String, String> _userProfile = {
     'name': 'User Name',
@@ -23,6 +27,9 @@ class MedicineProvider extends ChangeNotifier {
     'gender': 'Select',
   };
   Map<String, String> get userProfile => _userProfile;
+
+  List<Map<String, String>> _emergencyContacts = [];
+  List<Map<String, String>> get emergencyContacts => _emergencyContacts;
 
   double? get bmi {
     // Try to extract numbers from potentially flexible strings like "65 kg" or "5'8 ft"
@@ -50,17 +57,20 @@ class MedicineProvider extends ChangeNotifier {
          }
        }
     } else {
-      final hNum = double.tryParse(hStr.replaceAll(RegExp(r'[^0-9.]'), ''));
-      if (hNum != null && hNum > 0) {
-        if (hNum < 3) {
-          // Likely Meters (e.g. 1.72)
-          heightInMeters = hNum;
-        } else if (hNum < 10) {
-          // Likely Feet (e.g. 5.8)
-          heightInMeters = hNum * 0.3048;
-        } else {
-          // Likely Centimeters (e.g. 172)
-          heightInMeters = hNum / 100;
+      final filteredHStr = hStr.replaceAll(RegExp(r'[^0-9.]'), '');
+      if (filteredHStr.isNotEmpty) {
+        final hNum = double.tryParse(filteredHStr);
+        if (hNum != null && hNum > 0) {
+          if (hNum < 3) {
+            // Likely Meters (e.g. 1.72)
+            heightInMeters = hNum;
+          } else if (hNum < 10) {
+            // Likely Feet (e.g. 5.8)
+            heightInMeters = hNum * 0.3048;
+          } else {
+            // Likely Centimeters (e.g. 172)
+            heightInMeters = hNum / 100;
+          }
         }
       }
     }
@@ -83,10 +93,13 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> init() async {
     await _databaseService.init();
     await _notificationService.init();
-    await loadMedicines();
+    
+    // Load profile and preferences FIRST before scheduling
     await _loadProfile();
     
-    // Initial schedule refresh on app startup
+    await loadMedicines();
+    
+    // Initial schedule refresh on app startup - will only run if notifications are enabled
     await refreshAllSchedules();
     
     _isLoading = false;
@@ -368,12 +381,8 @@ class MedicineProvider extends ChangeNotifier {
     activityLog.sort((a, b) => (b['time'] as DateTime).compareTo(a['time'] as DateTime));
     activityLog = activityLog.take(10).toList();
 
-    // 6. Rank Logic
+    // 6. Overall Adherence
     final overallAdherence = getAdherenceStats()['percentage'];
-    String rank = 'Bronze';
-    if (overallAdherence >= 95) rank = 'Platinum';
-    else if (overallAdherence >= 85) rank = 'Gold';
-    else if (overallAdherence >= 70) rank = 'Silver';
 
     // 7. Time of Day Analysis
     Map<String, int> takenBySlot = {'Morning': 0, 'Noon': 0, 'Night': 0};
@@ -464,7 +473,6 @@ class MedicineProvider extends ChangeNotifier {
       'medicineStats': medicineStats,
       'timeAccuracy': totalDosesEvaluated > 0 ? (onTimeDoses / totalDosesEvaluated) * 100 : 100.0,
       'activityLog': activityLog,
-      'rank': rank,
       'bestTime': bestTime,
       'totalXP': totalXP,
       'level': level,
@@ -1056,6 +1064,7 @@ class MedicineProvider extends ChangeNotifier {
 
   void toggleNotifications() async {
     _notificationsEnabled = !_notificationsEnabled;
+    await _saveNotificationPreferences();
     notifyListeners();
     
     if (!_notificationsEnabled) {
@@ -1065,6 +1074,27 @@ class MedicineProvider extends ChangeNotifier {
       // Reschedule all active medicines
       await refreshAllSchedules();
     }
+  }
+
+  Future<void> setNotificationSound(String soundPath) async {
+    _notificationSound = soundPath;
+    await _saveNotificationPreferences();
+    notifyListeners();
+    
+    // Update the notification channel with the new sound
+    await _notificationService.updateNotificationChannel(soundPath);
+  }
+
+  List<Map<String, String>> getDefaultSounds() {
+    return [
+      {'name': 'System Default', 'path': 'default'},
+      {'name': 'Gentle Bell 🔔', 'path': 'assets/sounds/notification_gentle.mp3'},
+      {'name': 'Soft Chime ✨', 'path': 'assets/sounds/notification_chime.wav'},
+      {'name': 'Soft Touch 🌸', 'path': 'assets/sounds/notification_soft.mp3'},
+      {'name': 'Knock Knock 🚪', 'path': 'assets/sounds/notification_knock.mp3'},
+      {'name': 'Playful 🎵', 'path': 'assets/sounds/notification_playful.mp3'},
+      {'name': 'Medicine Reminder 💊', 'path': 'assets/sounds/notification_reminder.mp3'},
+    ];
   }
 
   Future<void> _loadProfile() async {
@@ -1085,8 +1115,34 @@ class MedicineProvider extends ChangeNotifier {
       'height': height,
       'age': age,
       'gender': gender,
+      'gender': gender,
     };
+    
+    final ecListJson = box.get('emergencyContacts', defaultValue: '[]');
+    try {
+      final List<dynamic> decoded = jsonDecode(ecListJson);
+      _emergencyContacts = decoded.map((e) => Map<String, String>.from(e)).toList();
+    } catch (e) {
+      _emergencyContacts = [];
+    }
+
+    await _loadNotificationPreferences();
     notifyListeners();
+  }
+
+  Future<void> _saveNotificationPreferences() async {
+    final box = await Hive.openBox('settings');
+    await box.put('notificationsEnabled', _notificationsEnabled);
+    await box.put('notificationSound', _notificationSound);
+  }
+
+  Future<void> _loadNotificationPreferences() async {
+    final box = await Hive.openBox('settings');
+    _notificationsEnabled = box.get('notificationsEnabled', defaultValue: true);
+    _notificationSound = box.get('notificationSound', defaultValue: 'default');
+    
+    // Ensure channel is up to date with saved preference
+    await _notificationService.updateNotificationChannel(_notificationSound);
   }
 
   Future<void> updateProfile({
@@ -1116,5 +1172,58 @@ class MedicineProvider extends ChangeNotifier {
     if (gender != null) await box.put('userGender', gender);
     
     notifyListeners();
+  }
+
+  Future<void> addEmergencyContact(String name, String phone) async {
+    _emergencyContacts.add({'name': name, 'phone': phone});
+    await _saveEmergencyContacts();
+    notifyListeners();
+  }
+
+  Future<void> updateEmergencyContact(int index, String name, String phone) async {
+    if (index >= 0 && index < _emergencyContacts.length) {
+      final oldContact = _emergencyContacts[index];
+      // Preserve isPrimary status if it exists, defaulting to false
+      final isPrimary = oldContact['isPrimary'] == 'true';
+      _emergencyContacts[index] = {
+        'name': name, 
+        'phone': phone,
+        'isPrimary': isPrimary.toString()
+      };
+      await _saveEmergencyContacts();
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeEmergencyContact(int index) async {
+    if (index >= 0 && index < _emergencyContacts.length) {
+      _emergencyContacts.removeAt(index);
+      await _saveEmergencyContacts();
+      notifyListeners();
+    }
+  }
+
+  Future<void> setPrimaryContact(int index) async {
+    if (index >= 0 && index < _emergencyContacts.length) {
+      // Set all to false first
+      for (var i = 0; i < _emergencyContacts.length; i++) {
+        final contact = Map<String, String>.from(_emergencyContacts[i]);
+        contact['isPrimary'] = 'false';
+        _emergencyContacts[i] = contact;
+      }
+      
+      // Set selected to true
+      final contact = Map<String, String>.from(_emergencyContacts[index]);
+      contact['isPrimary'] = 'true';
+      _emergencyContacts[index] = contact;
+      
+      await _saveEmergencyContacts();
+      notifyListeners();
+    }
+  }
+  
+  Future<void> _saveEmergencyContacts() async {
+    final box = await Hive.openBox('settings');
+    await box.put('emergencyContacts', jsonEncode(_emergencyContacts));
   }
 }

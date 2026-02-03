@@ -15,15 +15,50 @@ class NotificationService {
   NotificationService._internal();
 
   Future<void> init() async {
-    // Initialization is done in main.dart for Awesome Notifications usually, 
-    // but we can put listeners here.
-    
     await AwesomeNotifications().setListeners(
         onActionReceivedMethod:         onActionReceivedMethod,
         onNotificationCreatedMethod:    onNotificationCreatedMethod,
         onNotificationDisplayedMethod:  onNotificationDisplayedMethod,
         onDismissActionReceivedMethod:  onDismissActionReceivedMethod
     );
+  }
+
+  /// Updates the notification channel with the specified sound
+  Future<void> updateNotificationChannel(String soundPath) async {
+    String? soundSource;
+    
+    if (soundPath == 'default') {
+      soundSource = null; // Use default system sound
+    } else if (soundPath.startsWith('assets/')) {
+      // Bundled asset: Use resource://raw/ approach
+      final String fileName = soundPath.split('/').last;
+      final String resourceName = fileName.split('.').first;
+      soundSource = 'resource://raw/$resourceName';
+    } else {
+      // Fallback for unknown paths (or previously set custom files that are no longer supported)
+      debugPrint('Warning: Unknown sound path type: $soundPath. Reverting to default.');
+      soundSource = null;
+    }
+
+    await AwesomeNotifications().setChannel(
+      NotificationChannel(
+        channelGroupKey: 'basic_channel_group',
+        channelKey: 'basic_channel', // Keeping same key to avoid multiple channels for now
+        channelName: 'Medicine Reminders',
+        channelDescription: 'Notifications for your scheduled medicines',
+        defaultColor: const Color(0xFF9D50DD),
+        ledColor: Colors.white,
+        importance: NotificationImportance.Max,
+        channelShowBadge: true,
+        locked: true,
+        defaultRingtoneType: DefaultRingtoneType.Notification,
+        soundSource: soundSource,
+        playSound: true,
+      ),
+      forceUpdate: true,
+    );
+    
+    debugPrint('Notification Channel Updated with sound: $soundSource');
   }
 
   /// Use this method to detect when a new notification or a schedule is created
@@ -49,38 +84,45 @@ class NotificationService {
   static Future <void> onActionReceivedMethod(ReceivedAction receivedAction) async {
     debugPrint("=== Notification Action Received ===");
     debugPrint("Action ID: ${receivedAction.id}");
-    debugPrint("Payload: ${receivedAction.payload}");
     
     final payload = receivedAction.payload;
     if (payload != null && payload.containsKey('medicineId')) {
       final medicineId = payload['medicineId'];
       
-      // Delay to ensure navigatorKey is assigned and context is ready
-      Future.delayed(const Duration(milliseconds: 600), () {
-        final context = navigatorKey.currentContext;
-        debugPrint("Navigator context available: ${context != null}");
-        
-        if (context != null) {
-          try {
-            final provider = Provider.of<MedicineProvider>(context, listen: false);
-            final medicine = provider.medicines.firstWhere(
-              (m) => m.id == medicineId,
-              orElse: () => throw Exception("Medicine not found in provider"),
-            );
-            
-            debugPrint("Navigating to details for: ${medicine.name}");
-            
-            // Push notification details. If already on a detail page, replace it.
-            navigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (context) => MedicineDetailsScreen(medicine: medicine),
-              ),
-            );
-          } catch (e) {
-            debugPrint("Navigation Error: $e");
+      // Instead of a fixed delay, we'll wait for the navigator to be available
+      int retryCount = 0;
+      while (navigatorKey.currentContext == null && retryCount < 10) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        retryCount++;
+      }
+
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        try {
+          final provider = Provider.of<MedicineProvider>(context, listen: false);
+          
+          // Ensure provider is initialized
+          if (provider.isLoading) {
+             await provider.loadMedicines();
           }
+
+          final medicine = provider.medicines.firstWhere(
+            (m) => m.id == medicineId,
+            orElse: () => throw Exception("Medicine not found"),
+          );
+          
+          debugPrint("Navigating to details for: ${medicine.name}");
+          
+          navigatorKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => MedicineDetailsScreen(medicine: medicine),
+            ),
+            (route) => route.isFirst,
+          );
+        } catch (e) {
+          debugPrint("Navigation Error: $e");
         }
-      });
+      }
     }
   }
 
@@ -125,8 +167,12 @@ class NotificationService {
     int? weekday, // 1-7 (Mon-Sun)
     DateTime? day, // Specific day
     bool repeats = true,
+    bool playSound = true, // Keep parameter for API consistency
     Map<String, String>? payload,
   }) async {
+    
+    // Note: Sound is controlled at channel level in awesome_notifications
+    // The playSound parameter is kept for API consistency but not used here
     
     await AwesomeNotifications().createNotification(
       content: NotificationContent(

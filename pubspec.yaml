@@ -50,6 +50,7 @@ dependencies:
   lottie: ^3.3.2
   qr_flutter: ^4.1.0
   url_launcher: ^6.3.2
+  audioplayers: ^6.0.0
   flutter_localizations:
     sdk: flutter
 
@@ -80,6 +81,7 @@ flutter:
   assets:
     - assets/animations/
     - assets/avatar/
+    - assets/sounds/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
