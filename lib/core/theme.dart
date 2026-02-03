@@ -94,7 +94,7 @@ class AppTheme {
         fillColor: surfaceColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        hintStyle: TextStyle(color: textSecondary.withOpacity(0.4)),
+        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.4)),
         prefixIconColor: textSecondary,
       ),
 
@@ -108,7 +108,7 @@ class AppTheme {
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
-        indicatorColor: customPrimary.withOpacity(0.1),
+        indicatorColor: customPrimary.withValues(alpha: 0.1),
         labelTextStyle: WidgetStateProperty.all(
           GoogleFonts.outfit(color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
         ),

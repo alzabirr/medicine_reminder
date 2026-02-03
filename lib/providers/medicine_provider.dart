@@ -18,9 +18,58 @@ class MedicineProvider extends ChangeNotifier {
     'avatar': 'assets/avatar/Aven.jpg',
     'bloodGroup': 'Select',
     'weight': '—',
-    'allergies': 'None',
+    'height': '—',
+    'age': '—',
+    'gender': 'Select',
   };
   Map<String, String> get userProfile => _userProfile;
+
+  double? get bmi {
+    // Try to extract numbers from potentially flexible strings like "65 kg" or "5'8 ft"
+    final weightStr = _userProfile['weight']?.replaceAll(RegExp(r'[^0-9.]'), '');
+    
+    double? weight = double.tryParse(weightStr ?? '');
+    double? heightInMeters;
+
+    final hStr = _userProfile['height']?.toLowerCase() ?? '';
+    
+    // Check if height is in feet/inches format e.g. "5.8" or "5'8"
+    if (hStr.contains("'") || hStr.contains("ft")) {
+       final parts = hStr.split(RegExp(r"['\sft]+"));
+       if (parts.length >= 2) {
+         final feet = double.tryParse(parts[0]);
+         final inches = double.tryParse(parts[1]);
+         if (feet != null && inches != null) {
+           final totalInches = (feet * 12) + inches;
+           heightInMeters = totalInches * 0.0254;
+         }
+       } else if (parts.isNotEmpty) {
+         final feet = double.tryParse(parts[0]);
+         if (feet != null) {
+           heightInMeters = feet * 0.3048;
+         }
+       }
+    } else {
+      final hNum = double.tryParse(hStr.replaceAll(RegExp(r'[^0-9.]'), ''));
+      if (hNum != null && hNum > 0) {
+        if (hNum < 3) {
+          // Likely Meters (e.g. 1.72)
+          heightInMeters = hNum;
+        } else if (hNum < 10) {
+          // Likely Feet (e.g. 5.8)
+          heightInMeters = hNum * 0.3048;
+        } else {
+          // Likely Centimeters (e.g. 172)
+          heightInMeters = hNum / 100;
+        }
+      }
+    }
+    
+    if (weight != null && heightInMeters != null && heightInMeters > 0) {
+      return weight / (heightInMeters * heightInMeters);
+    }
+    return null;
+  }
 
   // Getters for filtered lists
   List<Medicine> _medicines = []; // Internal storage
@@ -68,9 +117,13 @@ class MedicineProvider extends ChangeNotifier {
         final isToday = currentDate.year == today.year && currentDate.month == today.month && currentDate.day == today.day;
         
         bool isDoseDay = false;
-        if (medicine.interval == 1) isDoseDay = true;
-        else if (medicine.interval == 7) isDoseDay = currentDate.weekday == start.weekday;
-        else isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = currentDate.weekday == start.weekday;
+        } else {
+          isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+        }
 
         if (isDoseDay) {
           for (var slot in medicine.timeSlots) {
@@ -103,9 +156,13 @@ class MedicineProvider extends ChangeNotifier {
       for (int i = 0; i < daysCount; i++) {
         final currentDate = start.add(Duration(days: i));
         bool isDoseDay = false;
-        if (medicine.interval == 1) isDoseDay = true;
-        else if (medicine.interval == 7) isDoseDay = currentDate.weekday == start.weekday;
-        else isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = currentDate.weekday == start.weekday;
+        } else {
+          isDoseDay = currentDate.difference(start).inDays % medicine.interval == 0;
+        }
 
         if (isDoseDay) {
           for (var slot in medicine.timeSlots) {
@@ -172,9 +229,7 @@ class MedicineProvider extends ChangeNotifier {
     int bestStreak = 0;
     int tempStreak = 0;
     
-    // Count backwards from yesterday for current streak
-    // Today might be partial, so we check if today is fully taken or still in progress
-    bool checkedToday = false;
+
     
     // Simple streak logic: check each day starting from today backwards
     for (int i = 0; ; i++) {
@@ -357,9 +412,13 @@ class MedicineProvider extends ChangeNotifier {
         if (date.isBefore(start)) continue;
 
         bool isDoseDay = false;
-        if (med.interval == 1) isDoseDay = true;
-        else if (med.interval == 7) isDoseDay = date.weekday == start.weekday;
-        else isDoseDay = date.difference(start).inDays % med.interval == 0;
+        if (med.interval == 1) {
+          isDoseDay = true;
+        } else if (med.interval == 7) {
+          isDoseDay = date.weekday == start.weekday;
+        } else {
+          isDoseDay = date.difference(start).inDays % med.interval == 0;
+        }
 
         if (isDoseDay) {
           scheduled += med.timeSlots.length;
@@ -379,9 +438,13 @@ class MedicineProvider extends ChangeNotifier {
           final start = DateTime(med.startTime.year, med.startTime.month, med.startTime.day);
           if (date.isBefore(start)) continue;
           bool isDoseDay = false;
-          if (med.interval == 1) isDoseDay = true;
-          else if (med.interval == 7) isDoseDay = date.weekday == start.weekday;
-          else isDoseDay = date.difference(start).inDays % med.interval == 0;
+          if (med.interval == 1) {
+            isDoseDay = true;
+          } else if (med.interval == 7) {
+            isDoseDay = date.weekday == start.weekday;
+          } else {
+            isDoseDay = date.difference(start).inDays % med.interval == 0;
+          }
           if (isDoseDay) {
             lwScheduled += med.timeSlots.length;
             lwTaken += med.takenHistory.where((dt) => dt.year == date.year && dt.month == date.month && dt.day == date.day).length;
@@ -392,12 +455,7 @@ class MedicineProvider extends ChangeNotifier {
     double comparison = overallAdherence - lastWeekAdherence;
 
     // 11. Achievements
-    List<Map<String, dynamic>> achievements = [
-      {'title': 'Alpha', 'icon': Icons.bolt_rounded, 'unlocked': totalTakenDoses >= 1},
-      {'title': 'Consistent', 'icon': Icons.calendar_today_rounded, 'unlocked': currentStreak >= 3},
-      {'title': 'Master', 'icon': Icons.emoji_events_rounded, 'unlocked': currentStreak >= 7},
-      {'title': 'Punctual', 'icon': Icons.timer_rounded, 'unlocked': (totalDosesEvaluated > 0 ? (onTimeDoses / totalDosesEvaluated) * 100 : 0) >= 90},
-    ];
+
 
     return {
       'weeklyTrend': weeklyTrend,
@@ -413,7 +471,6 @@ class MedicineProvider extends ChangeNotifier {
       'levelProgress': levelProgress,
       'heatmap': monthlyHeatmap,
       'comparison': comparison,
-      'achievements': achievements,
     };
   }
 
@@ -468,9 +525,13 @@ class MedicineProvider extends ChangeNotifier {
 
         // Check if it's a dose day for THIS medicine
         bool isDoseDay = false;
-        if (medicine.interval == 1) isDoseDay = true;
-        else if (medicine.interval == 7) isDoseDay = currentDate.weekday == medStart.weekday;
-        else isDoseDay = currentDate.difference(medStart).inDays % medicine.interval == 0;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = currentDate.weekday == medStart.weekday;
+        } else {
+          isDoseDay = currentDate.difference(medStart).inDays % medicine.interval == 0;
+        }
 
         if (isDoseDay) {
           final int totalSlots = medicine.timeSlots.length;
@@ -532,9 +593,13 @@ class MedicineProvider extends ChangeNotifier {
         }
 
         bool isDoseDay = false;
-        if (medicine.interval == 1) isDoseDay = true;
-        else if (medicine.interval == 7) isDoseDay = targetDate.weekday == start.weekday;
-        else isDoseDay = targetDate.difference(start).inDays % medicine.interval == 0;
+        if (medicine.interval == 1) {
+          isDoseDay = true;
+        } else if (medicine.interval == 7) {
+          isDoseDay = targetDate.weekday == start.weekday;
+        } else {
+          isDoseDay = targetDate.difference(start).inDays % medicine.interval == 0;
+        }
         
         if (!isDoseDay) continue;
 
@@ -640,6 +705,14 @@ class MedicineProvider extends ChangeNotifier {
 
   // Hard Delete: Permanent Removal
   Future<void> deletePermanently(String id) async {
+    // Find it in full list to cancel notifications before database removal
+    try {
+      final medicine = _medicines.firstWhere((m) => m.id == id);
+      await _cancelNotifications(medicine);
+    } catch (_) {
+      // Already gone or not found, proceed to DB delete
+    }
+    
     await _databaseService.deleteMedicine(id);
     await loadMedicines();
   }
@@ -687,9 +760,16 @@ class MedicineProvider extends ChangeNotifier {
       // Cancel standard daily/weekly
       await _notificationService.cancelNotification(baseId);
       
-      // Cancel potential manual occurrences (next 10) for interval-based
-      for (int i = 0; i < 10; i++) {
-        await _notificationService.cancelNotification((medicine.id + label + i.toString()).hashCode);
+      // Cancel individual occurrences (up to 90 days)
+      final DateTime now = DateTime.now();
+      final DateTime today = DateTime(now.year, now.month, now.day);
+      final DateTime start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+      
+      // Iterate over the likely window we used to schedule
+      for (int i = 0; i <= 95; i++) {
+        // Normalize search date to midnight to match scheduling logic
+        final date = (today.isBefore(start) ? start : today.subtract(const Duration(days: 5))).add(Duration(days: i));
+        await _notificationService.cancelNotification((medicine.id + label + date.toIso8601String()).hashCode);
       }
     }
   }
@@ -708,6 +788,8 @@ class MedicineProvider extends ChangeNotifier {
     // For simplicity and robustness: just trigger scheduling for each.
     
     for (final medicine in activeMedicines) {
+      // Clear previous schedules first to be safe
+      await _cancelNotifications(medicine);
       await _scheduleNotifications(medicine, baseTime: now);
     }
   }
@@ -719,8 +801,10 @@ class MedicineProvider extends ChangeNotifier {
     
     // 1. Check if medicine has already ended
     if (medicine.endDate != null) {
-      final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-      if (today.isAfter(end)) {
+      final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day, 23, 59);
+      if (now.isAfter(end)) {
+        // Already ended, make sure it's canceled (already done in refreshAllSchedules, but good for direct calls)
+        await _cancelNotifications(medicine);
         return;
       }
     }
@@ -761,50 +845,88 @@ class MedicineProvider extends ChangeNotifier {
         final slotKey = medicine.id + label;
 
         if (medicine.interval == 1) {
-          // Daily: Use standard repeating notification
-          // If start date is in future, we technically should wait.
-          // BUT AwesomeNotifications repeating daily starts "now" if we don't specify a date, 
-          // or starts on the specific date if we do.
-          
-          if (start.isAfter(today)) {
-             // Future start: Schedule a specific "Daily" starting from that date?
-             // AwesomeNotifications doesn't effortlessly support "Repeat Daily starting from X" 
-             // except by scheduling the first one on X with repeats=true.
-             await _notificationService.scheduleNotification(
-                id: slotKey.hashCode,
-                title: 'Daily: ${medicine.name}',
-                body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                hour: hour,
-                minute: minute,
-                day: start, // Start on the start date
-                repeats: true,
-                payload: {'medicineId': medicine.id},
-             );
+          // Daily
+          if (medicine.endDate == null) {
+            // No end date: Use standard repeating notification
+            if (start.isAfter(today)) {
+              await _notificationService.scheduleNotification(
+                  id: slotKey.hashCode,
+                  title: 'Daily: ${medicine.name}',
+                  body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                  hour: hour,
+                  minute: minute,
+                  day: start,
+                  repeats: true,
+                  payload: {'medicineId': medicine.id},
+              );
+            } else {
+              await _notificationService.scheduleNotification(
+                  id: slotKey.hashCode,
+                  title: 'Daily: ${medicine.name}',
+                  body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                  hour: hour,
+                  minute: minute,
+                  repeats: true,
+                  payload: {'medicineId': medicine.id},
+              );
+            }
           } else {
-             // Already started: Schedule for Today (or next occurrence by hour)
-             await _notificationService.scheduleNotification(
-                id: slotKey.hashCode,
-                title: 'Daily: ${medicine.name}',
-                body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                hour: hour,
-                minute: minute,
-                repeats: true,
-                payload: {'medicineId': medicine.id},
-             );
+            // Has end date: Schedule individual days to respect it
+             final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+             int daysLimit = end.difference(today).inDays;
+             if (daysLimit > scheduleWindowDays) daysLimit = scheduleWindowDays;
+             
+             for (int i = 0; i <= daysLimit; i++) {
+               final occurrenceDate = today.add(Duration(days: i));
+               if (occurrenceDate.isBefore(start)) continue;
+               if (occurrenceDate.isAfter(end)) break;
+               
+               await _notificationService.scheduleNotification(
+                 id: (slotKey + occurrenceDate.toIso8601String()).hashCode,
+                 title: 'Daily: ${medicine.name}',
+                 body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                 hour: hour,
+                 minute: minute,
+                 day: occurrenceDate,
+                 repeats: false,
+                 payload: {'medicineId': medicine.id},
+               );
+             }
           }
           
         } else if (medicine.interval == 7) {
           // Weekly
-           await _notificationService.scheduleNotification(
-            id: slotKey.hashCode,
-            title: 'Weekly: ${medicine.name}',
-            body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-            hour: hour,
-            minute: minute,
-            weekday: start.weekday,
-            repeats: true,
-            payload: {'medicineId': medicine.id},
-          );
+          if (medicine.endDate == null) {
+            await _notificationService.scheduleNotification(
+              id: slotKey.hashCode,
+              title: 'Weekly: ${medicine.name}',
+              body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+              hour: hour,
+              minute: minute,
+              weekday: start.weekday,
+              repeats: true,
+              payload: {'medicineId': medicine.id},
+            );
+          } else {
+             // Has end date: Schedule individual weeks
+             final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
+             for (int i = 0; i < (scheduleWindowDays / 7).ceil(); i++) {
+               final occurrenceDate = start.add(Duration(days: i * 7));
+               if (occurrenceDate.isBefore(today)) continue;
+               if (occurrenceDate.isAfter(end)) break;
+               
+               await _notificationService.scheduleNotification(
+                 id: (slotKey + occurrenceDate.toIso8601String()).hashCode,
+                 title: 'Weekly: ${medicine.name}',
+                 body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
+                 hour: hour,
+                 minute: minute,
+                 day: occurrenceDate,
+                 repeats: false,
+                 payload: {'medicineId': medicine.id},
+               );
+             }
+          }
         } else {
           // Interval (Every X Days) - Rolling Window Logic
           
@@ -951,14 +1073,18 @@ class MedicineProvider extends ChangeNotifier {
     final avatar = box.get('userAvatar', defaultValue: 'assets/avatar/Aven.jpg');
     final bloodGroup = box.get('userBloodGroup', defaultValue: 'Select');
     final weight = box.get('userWeight', defaultValue: '—');
-    final allergies = box.get('userAllergies', defaultValue: 'None');
+    final height = box.get('userHeight', defaultValue: '—');
+    final age = box.get('userAge', defaultValue: '—');
+    final gender = box.get('userGender', defaultValue: 'Select');
     
     _userProfile = {
       'name': name,
       'avatar': avatar,
       'bloodGroup': bloodGroup,
       'weight': weight,
-      'allergies': allergies,
+      'height': height,
+      'age': age,
+      'gender': gender,
     };
     notifyListeners();
   }
@@ -968,20 +1094,26 @@ class MedicineProvider extends ChangeNotifier {
     required String avatar,
     String? bloodGroup,
     String? weight,
-    String? allergies,
+    String? height,
+    String? age,
+    String? gender,
   }) async {
     _userProfile['name'] = name;
     _userProfile['avatar'] = avatar;
     if (bloodGroup != null) _userProfile['bloodGroup'] = bloodGroup;
     if (weight != null) _userProfile['weight'] = weight;
-    if (allergies != null) _userProfile['allergies'] = allergies;
+    if (height != null) _userProfile['height'] = height;
+    if (age != null) _userProfile['age'] = age;
+    if (gender != null) _userProfile['gender'] = gender;
     
     final box = await Hive.openBox('settings');
     await box.put('userName', name);
     await box.put('userAvatar', avatar);
     if (bloodGroup != null) await box.put('userBloodGroup', bloodGroup);
     if (weight != null) await box.put('userWeight', weight);
-    if (allergies != null) await box.put('userAllergies', allergies);
+    if (height != null) await box.put('userHeight', height);
+    if (age != null) await box.put('userAge', age);
+    if (gender != null) await box.put('userGender', gender);
     
     notifyListeners();
   }

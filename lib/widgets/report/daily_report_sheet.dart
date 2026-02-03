@@ -72,7 +72,7 @@ class DailyReportSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  '${totalTaken} Taken',
+                  '$totalTaken Taken',
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.w800,
                     color: Theme.of(context).primaryColor,
@@ -146,7 +146,7 @@ class DailyReportSheet extends StatelessWidget {
                   ],
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 24),
           ],
           
@@ -205,7 +205,7 @@ class DailyReportSheet extends StatelessWidget {
                   ],
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 24),
           ],
           const SizedBox(height: 32),

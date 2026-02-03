@@ -17,9 +17,10 @@ class SettingsScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
+            bottom: false,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -45,14 +46,7 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   _buildSectionLabel('App Settings'),
                   const SizedBox(height: 16),
-                  _buildSettingItem(
-                    context,
-                    icon: Icons.language_rounded,
-                    onTap: () => _showInfoDialog(context, 'Language', 'Multiple languages support coming soon! \n\nStay tuned for Bengali and more.'),
-                    title: 'Language',
-                    subtitle: 'English (US)',
-                  ),
-                  const SizedBox(height: 16),
+
                   _buildSettingItem(
                     context,
                     icon: Icons.security_rounded,
@@ -79,8 +73,8 @@ class SettingsScreen extends StatelessWidget {
                     context,
                     icon: Icons.palette_outlined,
                     onTap: () => _showColorPickerSheet(context, themeProvider),
-                    title: 'Accent Color',
-                    subtitle: 'Current: ${themeProvider.accentColor.value.toRadixString(16).toUpperCase().substring(2)}',
+                    title: 'App Theme Color',
+                    subtitle: 'Current: ${_getColorName(themeProvider.accentColor)}',
                     trailing: Container(
                       width: 24,
                       height: 24,
@@ -282,7 +276,7 @@ class SettingsScreen extends StatelessWidget {
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 40, offset: const Offset(0, -10)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 40, offset: const Offset(0, -10)),
           ],
         ),
         child: Column(
@@ -294,7 +288,7 @@ class SettingsScreen extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -304,7 +298,7 @@ class SettingsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Signature Color',
+                  'Choose App Theme',
                   style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 24),
                 ),
                 IconButton(
@@ -317,7 +311,7 @@ class SettingsScreen extends StatelessWidget {
             Text(
               'Select wait suits your style best',
               style: GoogleFonts.outfit(
-                color: AppTheme.textSecondary.withOpacity(0.6),
+                color: AppTheme.textSecondary.withValues(alpha: 0.6),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -331,32 +325,38 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildColorGrid(BuildContext context, ThemeProvider provider) {
-    final List<Map<String, dynamic>> colors = [
-     
-     // Custom Colors
-      {'color': const Color(0xFFD02752), 'name': 'Crimson'},
-      {'color': const Color(0xFF8A244B), 'name': 'Maroon'},
-      {'color': const Color(0xFF111F35), 'name': 'Midnight Blue'},
-      {'color': const Color(0xFF30364F), 'name': 'Deep Navy'},
-      {'color': const Color(0xFF36656B), 'name': 'Teal Blue'},
-      {'color': const Color(0xFF628141), 'name': 'Olive Green'},
-      {'color': const Color(0xFF6F8F72), 'name': 'Sage Green'},
-      {'color': const Color(0xFFB12C00), 'name': 'Burnt Orange'},
-      {'color': const Color(0xFF6A1E55), 'name': 'Plum'},
-      {'color': const Color(0xFFFF204E), 'name': 'Flash Pink'},
-      {'color': const Color(0xFF009688), 'name': 'Teal'},
-      {'color': const Color(0xFF06B6D4), 'name': 'Cyan'},
-      {'color': const Color(0xFF03A9F4), 'name': 'Light Blue'},
-      {'color': const Color(0xFF2196F3), 'name': 'Blue'},
-      {'color': const Color(0xFF64748B), 'name': 'Slate'},
-      {'color': const Color(0xFF71717A), 'name': 'Zinc'},
-      {'color': const Color(0xFF78716C), 'name': 'Stone'},
-      {'color': const Color(0xFF795548), 'name': 'Brown'},
-      {'color': const Color(0xFF455A64), 'name': 'Blue Grey'},
-      
-    ];
+  static const List<Map<String, dynamic>> _appColors = [
+      {'color': Color(0xFFD02752), 'name': 'Ruby Red'},
+      {'color': Color(0xFF8A244B), 'name': 'Wine'},
+      {'color': Color(0xFF111F35), 'name': 'Night'},
+      {'color': Color(0xFF30364F), 'name': 'Navy'},
+      {'color': Color(0xFF36656B), 'name': 'Ocean'},
+      {'color': Color(0xFF628141), 'name': 'Forest'},
+      {'color': Color(0xFF6F8F72), 'name': 'Sage'},
+      {'color': Color(0xFFB12C00), 'name': 'Sunset'},
+      {'color': Color(0xFF6A1E55), 'name': 'Berry'},
+      {'color': Color(0xFFFF204E), 'name': 'Rose'},
+      {'color': Color(0xFF009688), 'name': 'Teal'},
+      {'color': Color(0xFF06B6D4), 'name': 'Sky'},
+      {'color': Color(0xFF03A9F4), 'name': 'Blue'},
+      {'color': Color(0xFF2196F3), 'name': 'Royal'},
+      {'color': Color(0xFF64748B), 'name': 'Slate'},
+      {'color': Color(0xFF71717A), 'name': 'Grey'},
+      {'color': Color(0xFF78716C), 'name': 'Stone'},
+      {'color': Color(0xFF795548), 'name': 'Coffee'},
+      {'color': Color(0xFF455A64), 'name': 'Storm'},
+  ];
 
+  String _getColorName(Color color) {
+    try {
+      final match = _appColors.firstWhere((item) => (item['color'] as Color).value == color.value);
+      return match['name'] as String;
+    } catch (e) {
+      return 'Custom';
+    }
+  }
+
+  Widget _buildColorGrid(BuildContext context, ThemeProvider provider) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -365,9 +365,9 @@ class SettingsScreen extends StatelessWidget {
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: colors.length,
+      itemCount: _appColors.length,
       itemBuilder: (context, index) {
-        final colorData = colors[index];
+        final colorData = _appColors[index];
         final Color color = colorData['color'];
         final isSelected = provider.accentColor.value == color.value;
 
@@ -379,7 +379,7 @@ class SettingsScreen extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [color, color.withOpacity(0.8)],
+                colors: [color, color.withValues(alpha: 0.8)],
               ),
               shape: BoxShape.circle,
               border: Border.all(
@@ -388,7 +388,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

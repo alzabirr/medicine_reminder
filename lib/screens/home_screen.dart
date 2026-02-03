@@ -304,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const SizedBox(height: 60), // Top spacing to help centering
+                                  const SizedBox(height: 220), // Increased top spacing more
                                   Container(
                                     padding: const EdgeInsets.all(32),
                                     decoration: BoxDecoration(

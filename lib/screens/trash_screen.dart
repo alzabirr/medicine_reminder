@@ -120,7 +120,7 @@ class TrashScreen extends StatelessWidget {
                                       secondaryBackground: Container(
                                         alignment: Alignment.centerRight,
                                         padding: const EdgeInsets.symmetric(horizontal: 24),
-                                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
+      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
                                         child: Icon(Icons.delete_forever_rounded, color: Theme.of(context).colorScheme.error, size: 28),
                                       ),
 
@@ -148,6 +148,7 @@ class TrashScreen extends StatelessWidget {
                                         child: MedicineCard(
                                           medicine: medicine,
                                           onCardTap: null,
+                                          showNextDose: false,
                                         ),
                                       ),
                                     ),

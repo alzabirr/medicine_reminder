@@ -14,6 +14,7 @@ class MedicineCard extends StatefulWidget {
   final VoidCallback? onCardTap;
   final Function(String slot)? onSlotTap;
   final DateTime? dateContext;
+  final bool showNextDose;
 
   const MedicineCard({
     super.key,
@@ -21,6 +22,7 @@ class MedicineCard extends StatefulWidget {
     this.onSlotTap,
     this.onCardTap,
     this.dateContext,
+    this.showNextDose = true,
   });
 
   @override
@@ -55,9 +57,9 @@ class _MedicineCardState extends State<MedicineCard> {
     final todayMidnight = DateTime(now.year, now.month, now.day);
     
     // Doses taken on the date currently being VIEWED (for slot visuals)
-    final takenCountForDate = widget.medicine.takenHistory.where(
-      (d) => d.year == targetDay.year && d.month == targetDay.month && d.day == targetDay.day,
-    ).length;
+    // final takenCountForDate = widget.medicine.takenHistory.where(
+    //   (d) => d.year == targetDay.year && d.month == targetDay.month && d.day == targetDay.day,
+    // ).length;
     
     // Doses taken TODAY (for actual countdown and course completion logic)
     final takenCountToday = widget.medicine.takenHistory.where(
@@ -227,7 +229,7 @@ class _MedicineCardState extends State<MedicineCard> {
                                     ? AppTheme.successColor.withValues(alpha: 0.2)
                                     : Theme.of(context).primaryColor.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(10),
-                                border: isTaken ? Border.all(color: AppTheme.successColor.withOpacity(0.5), width: 1) : null,
+                                border: isTaken ? Border.all(color: AppTheme.successColor.withValues(alpha: 0.5), width: 1) : null,
                               ),
                               child: Text(
                                 timeText,
@@ -264,8 +266,8 @@ class _MedicineCardState extends State<MedicineCard> {
                         // Next Dose Indicator (Live Countdown)
                         Builder(
                           builder: (context) {
-                            // Only show live countdown if viewing the current day and course is NOT finished
-                            if (!isCurrentDay || isFullyFinished) return const SizedBox.shrink();
+                            // Only show live countdown if viewing the current day, course is NOT finished, and showNextDose is true
+                            if (!isCurrentDay || isFullyFinished || !widget.showNextDose) return const SizedBox.shrink();
 
                             Duration? remaining = MedicineUtils.getTimeUntilNextDose(widget.medicine, takenCount: takenCountToday);
   

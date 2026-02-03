@@ -18,20 +18,26 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _weightController;
-  late TextEditingController _allergiesController;
+  late TextEditingController _heightController;
+  late TextEditingController _heightFeetController;
+  late TextEditingController _heightInchesController;
+  late TextEditingController _ageController;
   late String _selectedAvatar;
   String? _selectedBloodGroup;
+  String? _selectedGender;
   bool _isEditing = false;
+  bool _isHeightInFeet = false;
   final ImagePicker _picker = ImagePicker();
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _genders = ['Male', 'Female', 'Other'];
 
   final List<String> _avatarAssets = [
     'assets/avatar/Aven.jpg',
     'assets/avatar/Eva.png',
     'assets/avatar/Henry.jpg',
     'assets/avatar/Kiro.jpg',
-    'assets/avatar/Lilt.png',
+    'assets/avatar/Lilly.png',
     'assets/avatar/Mitsumi.jpg',
     'assets/avatar/Nori.jpg',
     'assets/avatar/Norman.jpg',
@@ -49,27 +55,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final provider = Provider.of<MedicineProvider>(context, listen: false);
     _nameController = TextEditingController(text: provider.userProfile['name']);
     _weightController = TextEditingController(text: provider.userProfile['weight'] == '—' ? '' : provider.userProfile['weight']);
-    _allergiesController = TextEditingController(text: provider.userProfile['allergies'] == 'None' ? '' : provider.userProfile['allergies']);
+    _ageController = TextEditingController(text: provider.userProfile['age'] == '—' ? '' : provider.userProfile['age']);
     _selectedAvatar = provider.userProfile['avatar']!;
     _selectedBloodGroup = provider.userProfile['bloodGroup'] == 'Select' ? null : provider.userProfile['bloodGroup'];
+    _selectedGender = provider.userProfile['gender'] == 'Select' ? null : provider.userProfile['gender'];
+
+    // Height Parsing
+    final hStr = provider.userProfile['height'] ?? '—';
+    _heightController = TextEditingController();
+    _heightFeetController = TextEditingController();
+    _heightInchesController = TextEditingController();
+
+    if (hStr.contains("'") || hStr.contains("ft")) {
+      _isHeightInFeet = true;
+      final parts = hStr.split(RegExp(r"['\sft]+"));
+      if (parts.length >= 2) {
+        _heightFeetController.text = parts[0];
+        _heightInchesController.text = parts[1];
+      } else if (parts.isNotEmpty) {
+        _heightFeetController.text = parts[0];
+      }
+    } else {
+      _isHeightInFeet = false;
+      _heightController.text = hStr == '—' ? '' : hStr.replaceAll(RegExp(r'[^0-9.]'), '');
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _weightController.dispose();
-    _allergiesController.dispose();
+    _heightController.dispose();
+    _heightFeetController.dispose();
+    _heightInchesController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
   void _saveProfile() {
     final provider = Provider.of<MedicineProvider>(context, listen: false);
+    String heightVal = '—';
+    if (_isHeightInFeet) {
+      if (_heightFeetController.text.isNotEmpty) {
+        heightVal = "${_heightFeetController.text}'${_heightInchesController.text.isEmpty ? '0' : _heightInchesController.text} ft";
+      }
+    } else {
+      if (_heightController.text.isNotEmpty) {
+        heightVal = "${_heightController.text} cm";
+      }
+    }
+
     provider.updateProfile(
       name: _nameController.text,
       avatar: _selectedAvatar,
       bloodGroup: _selectedBloodGroup ?? 'Select',
       weight: _weightController.text.isEmpty ? '—' : _weightController.text,
-      allergies: _allergiesController.text.isEmpty ? 'None' : _allergiesController.text,
+      height: heightVal,
+      age: _ageController.text.isEmpty ? '—' : _ageController.text,
+      gender: _selectedGender ?? 'Select',
     );
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -136,7 +179,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Consumer<MedicineProvider>(
         builder: (context, provider, child) {
-          final stats = provider.getAdherenceStats();
           final advanced = provider.getAdvancedAnalytics();
           
           return SingleChildScrollView(
@@ -156,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 32),
                 
-                if (!_isEditing) _buildInfoGrid(provider.userProfile),
+                if (!_isEditing) _buildInfoGrid(provider),
                 if (_isEditing) _buildEditHealthDetails(),
                 const SizedBox(height: 32),
                 _buildSectionHeader('Overall Adherence Breakdown'),
@@ -168,10 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 16),
                 _buildTrendChart(advanced['weeklyTrend']),
                 
-                const SizedBox(height: 32),
-                _buildSectionHeader('Achievements'),
-                const SizedBox(height: 16),
-                _buildAchievementShowcase(advanced['achievements']),
+
 
                 const SizedBox(height: 40),
               ],
@@ -400,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 40, offset: const Offset(0, -10)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 40, offset: const Offset(0, -10)),
           ],
         ),
         child: Column(
@@ -410,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -473,7 +512,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 28),
@@ -564,7 +603,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: InputDecoration(
             hintText: 'Your Name',
             border: UnderlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor)),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor.withOpacity(0.3))),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor.withValues(alpha: 0.3))),
           ),
         ),
       );
@@ -595,7 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         child: Column(
           children: [
-            Icon(Icons.pie_chart_outline_rounded, size: 48, color: AppTheme.textSecondary.withOpacity(0.5)),
+            Icon(Icons.pie_chart_outline_rounded, size: 48, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               'No activity recorded yet.',
@@ -710,15 +749,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.touch_app_rounded, size: 14, color: Theme.of(context).primaryColor),
-                Text(
-                  ' Tap for details',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+               
               ],
             ),
           ],
@@ -784,7 +815,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 48,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: AppTheme.textSecondary.withOpacity(0.1),
+                  color: AppTheme.textSecondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -818,7 +849,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -880,7 +911,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
-                              color: AppTheme.textSecondary.withOpacity(0.4),
+                              color: AppTheme.textSecondary.withValues(alpha: 0.4),
                               letterSpacing: 1.5,
                             ),
                           ),
@@ -900,7 +931,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Container(
                                       width: 2,
-                                      color: AppTheme.textSecondary.withOpacity(0.05),
+                                      color: AppTheme.textSecondary.withValues(alpha: 0.05),
                                     ),
                                     Container(
                                       width: 10,
@@ -946,7 +977,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     style: GoogleFonts.outfit(
                                                       fontWeight: FontWeight.w700,
                                                       fontSize: 13,
-                                                      color: color.withOpacity(0.8),
+                                                      color: color.withValues(alpha: 0.8),
                                                     ),
                                                   ),
                                                 ],
@@ -971,7 +1002,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               style: GoogleFonts.outfit(
                                                 fontWeight: FontWeight.w900,
                                                 fontSize: 8,
-                                                color: AppTheme.textSecondary.withOpacity(0.3),
+                                                color: AppTheme.textSecondary.withValues(alpha: 0.3),
                                                 letterSpacing: 1,
                                               ),
                                             ),
@@ -1017,24 +1048,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoGrid(Map<String, String> profile) {
+  Widget _buildInfoGrid(MedicineProvider provider) {
+    final profile = provider.userProfile;
+    final bmiVal = provider.bmi;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: AppTheme.getNeumorphicShadow(context),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildInfoItem(Icons.water_drop_rounded, 'Blood', profile['bloodGroup']!, Colors.redAccent),
-          _buildDivider(),
-          _buildInfoItem(Icons.monitor_weight_rounded, 'Weight', profile['weight'] == '—' ? '—' : '${profile['weight']} kg', Colors.blueAccent),
-          _buildDivider(),
-          _buildInfoItem(Icons.warning_amber_rounded, 'Allergy', profile['allergies']!, Colors.orangeAccent),
+          Row(
+            children: [
+              Expanded(child: _buildInfoItem(Icons.water_drop_rounded, 'Blood', profile['bloodGroup']!, Colors.redAccent)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildInfoItem(Icons.cake_rounded, 'Age', profile['age']!, Colors.purpleAccent)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildInfoItem(Icons.wc_rounded, 'Gender', profile['gender']!, Colors.teal)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildInfoItem(Icons.monitor_weight_rounded, 'Weight', profile['weight']!, Colors.blueAccent)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildInfoItem(Icons.height_rounded, 'Height', profile['height']!, Colors.green)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildInfoItem(
+                Icons.speed_rounded, 
+                'BMI', 
+                bmiVal != null ? bmiVal.toStringAsFixed(1) : '—', 
+                Colors.orangeAccent,
+                onTap: bmiVal != null ? () => _showBMIDetails(bmiVal) : null,
+              )),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildModernInfoRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+            Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1078,43 +1154,298 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
-                  'Weight (kg)', 
-                  _weightController, 
-                  TextInputType.number,
-                  Icons.monitor_weight_rounded,
-                  Colors.blueAccent,
+                child: _buildDropDownField(
+                  'Gender', 
+                  _genders, 
+                  _selectedGender, 
+                  (val) => setState(() => _selectedGender = val),
+                  Icons.wc_rounded,
+                  Colors.teal,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          _buildTextField(
-            'Allergies / Conditions', 
-            _allergiesController, 
-            TextInputType.text,
-            Icons.warning_amber_rounded,
-            Colors.orangeAccent,
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  'Age', 
+                  _ageController, 
+                  TextInputType.number,
+                  Icons.cake_rounded,
+                  Colors.purpleAccent,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(
+                  'Weight', 
+                  _weightController, 
+                  TextInputType.text,
+                  Icons.monitor_weight_rounded,
+                  Colors.blueAccent,
+                  hint: "e.g. 65 kg",
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                           Text(
+                            'Height', 
+                            style: GoogleFonts.outfit(
+                              fontSize: 12, 
+                              color: AppTheme.textSecondary.withValues(alpha: 0.7), 
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _isHeightInFeet = !_isHeightInFeet),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _isHeightInFeet ? 'Switch to CM' : 'Switch to FEET',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_isHeightInFeet)
+                      _buildTextField(
+                        '', 
+                        _heightController, 
+                        TextInputType.number,
+                        Icons.height_rounded,
+                        Colors.green,
+                        hint: "CM (e.g. 172)",
+                        showLabel: false,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              '', 
+                              _heightFeetController, 
+                              TextInputType.number,
+                              Icons.height_rounded,
+                              Colors.green,
+                              hint: "Feet",
+                              showLabel: false,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildTextField(
+                              '', 
+                              _heightInchesController, 
+                              TextInputType.number,
+                              Icons.straighten_rounded,
+                              Colors.green,
+                              hint: "Inches",
+                              showLabel: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Tip: Use 5\'8 format for height to get BMI in feet.',
+            style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value, Color color) {
+  Widget _buildInfoItem(IconData icon, String label, String value, Color color, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.1), width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(height: 2),
+            Text(
+              label, 
+              style: GoogleFonts.outfit(
+                fontSize: 9, 
+                color: AppTheme.textSecondary, 
+                fontWeight: FontWeight.w700
+              )
+            ),
+            Text(
+              value, 
+              style: GoogleFonts.outfit(
+                fontSize: 13, 
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              )
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBMIDetails(double bmi) {
+    String category = '';
+    String advice = '';
+    Color categoryColor = Colors.green;
+
+    if (bmi < 18.5) {
+      category = 'Underweight';
+      advice = 'You may need to eat more frequently and choose nutrient-rich foods.';
+      categoryColor = Colors.orange;
+    } else if (bmi < 25) {
+      category = 'Normal';
+      advice = 'Great job! Maintain your healthy lifestyle with balanced diet and exercise.';
+      categoryColor = Colors.green;
+    } else if (bmi < 30) {
+      category = 'Overweight';
+      advice = 'Consider increasing physical activity and managing calorie intake.';
+      categoryColor = Colors.orange;
+    } else {
+      category = 'Obese';
+      advice = 'It is recommended to consult a healthcare provider for a personalized health plan.';
+      categoryColor = Colors.red;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.textSecondary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Your BMI Details',
+              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: categoryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    bmi.toStringAsFixed(1),
+                    style: GoogleFonts.outfit(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: categoryColor,
+                    ),
+                  ),
+                  Text(
+                    category,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: categoryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              advice,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 32),
+            _buildBMIRangeInfo(),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBMIRangeInfo() {
     return Column(
       children: [
-        Icon(icon, color: color.withOpacity(0.8), size: 20),
-        const SizedBox(height: 6),
-        Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-        Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900)),
+        _buildRangeRow('Underweight', '< 18.5', Colors.orange),
+        _buildRangeRow('Normal', '18.5 - 24.9', Colors.green),
+        _buildRangeRow('Overweight', '25.0 - 29.9', Colors.orange),
+        _buildRangeRow('Obese', '≥ 30.0', Colors.red),
       ],
     );
   }
 
-  Widget _buildDivider() {
-    return Container(height: 30, width: 1, color: AppTheme.textSecondary.withOpacity(0.15));
+  Widget _buildRangeRow(String label, String range, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          Text(range, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.textSecondary)),
+        ],
+      ),
+    );
   }
+
+
 
   Widget _buildDropDownField(String label, List<String> items, String? value, Function(String?) onChanged, IconData icon, Color iconColor) {
     return Column(
@@ -1162,28 +1493,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, TextInputType type, IconData icon, Color iconColor) {
+  Widget _buildTextField(String label, TextEditingController controller, TextInputType type, IconData icon, Color iconColor, {String? hint, bool showLabel = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label, 
-            style: GoogleFonts.outfit(
-              fontSize: 12, 
-              color: AppTheme.textSecondary.withValues(alpha: 0.7), 
-              fontWeight: FontWeight.w800,
+        if (showLabel)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              label, 
+              style: GoogleFonts.outfit(
+                fontSize: 12, 
+                color: AppTheme.textSecondary.withValues(alpha: 0.7), 
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
         TextField(
           controller: controller,
           keyboardType: type,
           style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
           decoration: InputDecoration(
             isDense: false,
-            hintText: 'Enter $label',
+            hintText: hint ?? (showLabel ? 'Enter $label' : ''),
             hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppTheme.textSecondary.withValues(alpha: 0.4)),
             fillColor: Theme.of(context).scaffoldBackgroundColor,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1206,44 +1538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAchievementShowcase(List<Map<String, dynamic>> achievements) {
-    return SizedBox(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: achievements.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
-        itemBuilder: (context, index) {
-          final ach = achievements[index];
-          final isUnlocked = ach['unlocked'];
-          return Container(
-            width: 80,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isUnlocked ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isUnlocked ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.2)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(ach['icon'], color: isUnlocked ? Theme.of(context).primaryColor : Colors.grey, size: 28),
-                const SizedBox(height: 8),
-                Text(
-                  ach['title'],
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: isUnlocked ? Theme.of(context).primaryColor : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+
 
 
 }
