@@ -231,16 +231,29 @@ class _MedicineCardState extends State<MedicineCard> {
                                 borderRadius: BorderRadius.circular(10),
                                 border: isTaken ? Border.all(color: AppTheme.successColor.withValues(alpha: 0.5), width: 1) : null,
                               ),
-                              child: Text(
-                                timeText,
-                                style: TextStyle(
-                                  color: isDone 
-                                      ? AppTheme.successColor 
-                                      : Theme.of(context).primaryColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.3,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isDone) ...[
+                                    Icon(
+                                      Icons.check_rounded,
+                                      size: 12,
+                                      color: AppTheme.successColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    timeText,
+                                    style: TextStyle(
+                                      color: isDone 
+                                          ? AppTheme.successColor 
+                                          : Theme.of(context).primaryColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }).toList(),

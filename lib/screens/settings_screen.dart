@@ -935,11 +935,14 @@ class _EmergencyContactManagerSheetState extends State<_EmergencyContactManagerS
           
           ElevatedButton(
             onPressed: () {
-              if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
+              final name = nameController.text.trim();
+              final phone = phoneController.text.trim();
+              
+              if (name.isNotEmpty && phone.isNotEmpty) {
                 if (contact == null) {
-                  provider.addEmergencyContact(nameController.text, phoneController.text);
+                  provider.addEmergencyContact(name, phone);
                 } else {
-                  provider.updateEmergencyContact(index!, nameController.text, phoneController.text);
+                  provider.updateEmergencyContact(index!, name, phone);
                 }
                 Navigator.pop(ctx);
               }

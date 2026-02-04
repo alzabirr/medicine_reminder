@@ -13,6 +13,17 @@
 # Keep timezone database
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 
+# Hive
+-keep class io.hive.** { *; }
+-keepnames class io.hive.** { *; }
+-keep class * extends io.hive.TypeAdapter { *; }
+
+# Awesome Notifications
+-keep class me.carda.awesome_notifications.** { *; }
+
+# URL Launcher
+-keep class io.flutter.plugins.urllauncher.** { *; }
+
 # Ignore warnings for missing Play Core classes (deferred components not used)
 -dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
 -dontwarn com.google.android.play.core.**

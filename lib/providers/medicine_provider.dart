@@ -1115,7 +1115,6 @@ class MedicineProvider extends ChangeNotifier {
       'height': height,
       'age': age,
       'gender': gender,
-      'gender': gender,
     };
     
     final ecListJson = box.get('emergencyContacts', defaultValue: '[]');
@@ -1175,7 +1174,10 @@ class MedicineProvider extends ChangeNotifier {
   }
 
   Future<void> addEmergencyContact(String name, String phone) async {
-    _emergencyContacts.add({'name': name, 'phone': phone});
+    _emergencyContacts = [
+      ..._emergencyContacts,
+      {'name': name, 'phone': phone, 'isPrimary': 'false'}
+    ];
     await _saveEmergencyContacts();
     notifyListeners();
   }
@@ -1183,13 +1185,15 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> updateEmergencyContact(int index, String name, String phone) async {
     if (index >= 0 && index < _emergencyContacts.length) {
       final oldContact = _emergencyContacts[index];
-      // Preserve isPrimary status if it exists, defaulting to false
       final isPrimary = oldContact['isPrimary'] == 'true';
-      _emergencyContacts[index] = {
+      
+      final newList = List<Map<String, String>>.from(_emergencyContacts);
+      newList[index] = {
         'name': name, 
         'phone': phone,
         'isPrimary': isPrimary.toString()
       };
+      _emergencyContacts = newList;
       await _saveEmergencyContacts();
       notifyListeners();
     }
@@ -1197,7 +1201,9 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> removeEmergencyContact(int index) async {
     if (index >= 0 && index < _emergencyContacts.length) {
-      _emergencyContacts.removeAt(index);
+      final newList = List<Map<String, String>>.from(_emergencyContacts);
+      newList.removeAt(index);
+      _emergencyContacts = newList;
       await _saveEmergencyContacts();
       notifyListeners();
     }
@@ -1205,17 +1211,14 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> setPrimaryContact(int index) async {
     if (index >= 0 && index < _emergencyContacts.length) {
-      // Set all to false first
-      for (var i = 0; i < _emergencyContacts.length; i++) {
-        final contact = Map<String, String>.from(_emergencyContacts[i]);
+      final newList = _emergencyContacts.map((c) {
+        final contact = Map<String, String>.from(c);
         contact['isPrimary'] = 'false';
-        _emergencyContacts[i] = contact;
-      }
+        return contact;
+      }).toList();
       
-      // Set selected to true
-      final contact = Map<String, String>.from(_emergencyContacts[index]);
-      contact['isPrimary'] = 'true';
-      _emergencyContacts[index] = contact;
+      newList[index]['isPrimary'] = 'true';
+      _emergencyContacts = newList;
       
       await _saveEmergencyContacts();
       notifyListeners();
