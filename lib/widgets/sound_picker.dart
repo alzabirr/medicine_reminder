@@ -4,7 +4,6 @@ import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/core/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class SoundPickerSheet extends StatefulWidget {
   const SoundPickerSheet({super.key});

@@ -1079,10 +1079,14 @@ class MedicineProvider extends ChangeNotifier {
   Future<void> setNotificationSound(String soundPath) async {
     _notificationSound = soundPath;
     await _saveNotificationPreferences();
-    notifyListeners();
     
-    // Update the notification channel with the new sound
+    // Update the notification channel with the new sound (creates a new channel key on Android)
     await _notificationService.updateNotificationChannel(soundPath);
+    
+    // Force reschedule all notifications to use the new channel with the new sound
+    await refreshAllSchedules();
+    
+    notifyListeners();
   }
 
   List<Map<String, String>> getDefaultSounds() {
@@ -1094,6 +1098,8 @@ class MedicineProvider extends ChangeNotifier {
       {'name': 'Knock Knock 🚪', 'path': 'assets/sounds/notification_knock.mp3'},
       {'name': 'Playful 🎵', 'path': 'assets/sounds/notification_playful.mp3'},
       {'name': 'Medicine Reminder 💊', 'path': 'assets/sounds/notification_reminder.mp3'},
+      {'name': 'Death Note 📓', 'path': 'assets/sounds/death_note.mp3'},
+      {'name': 'Suzume ✨', 'path': 'assets/sounds/suzume_no_tojimari.mp3'},
     ];
   }
 

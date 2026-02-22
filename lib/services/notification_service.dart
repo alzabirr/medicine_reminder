@@ -8,6 +8,7 @@ import 'package:medi/models/medicine.dart';
 
 class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static String _currentChannelKey = 'basic_channel';
   
   // Singleton pattern not strictly necessary if used via Provider, but good practice
   static final NotificationService _instance = NotificationService._internal();
@@ -26,24 +27,28 @@ class NotificationService {
   /// Updates the notification channel with the specified sound
   Future<void> updateNotificationChannel(String soundPath) async {
     String? soundSource;
+    String newChannelKey = 'basic_channel';
     
     if (soundPath == 'default') {
       soundSource = null; // Use default system sound
+      newChannelKey = 'basic_channel_default';
     } else if (soundPath.startsWith('assets/')) {
       // Bundled asset: Use resource://raw/ approach
       final String fileName = soundPath.split('/').last;
       final String resourceName = fileName.split('.').first;
       soundSource = 'resource://raw/$resourceName';
+      newChannelKey = 'basic_channel_$resourceName';
     } else {
-      // Fallback for unknown paths (or previously set custom files that are no longer supported)
+      // Fallback for unknown paths
       debugPrint('Warning: Unknown sound path type: $soundPath. Reverting to default.');
       soundSource = null;
+      newChannelKey = 'basic_channel_default';
     }
 
     await AwesomeNotifications().setChannel(
       NotificationChannel(
         channelGroupKey: 'basic_channel_group',
-        channelKey: 'basic_channel', // Keeping same key to avoid multiple channels for now
+        channelKey: newChannelKey,
         channelName: 'Medicine Reminders',
         channelDescription: 'Notifications for your scheduled medicines',
         defaultColor: const Color(0xFF9D50DD),
@@ -58,7 +63,8 @@ class NotificationService {
       forceUpdate: true,
     );
     
-    debugPrint('Notification Channel Updated with sound: $soundSource');
+    _currentChannelKey = newChannelKey;
+    debugPrint('Notification Channel Updated to: $newChannelKey with sound: $soundSource');
   }
 
   /// Use this method to detect when a new notification or a schedule is created
@@ -133,7 +139,7 @@ class NotificationService {
     bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
     if (!isAllowed) {
       bool userGranted = await AwesomeNotifications().requestPermissionToSendNotifications(
-        channelKey: 'basic_channel',
+        channelKey: _currentChannelKey,
         permissions: [
           NotificationPermission.Alert,
           NotificationPermission.Sound,
@@ -177,7 +183,7 @@ class NotificationService {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: id,
-        channelKey: 'basic_channel',
+        channelKey: _currentChannelKey,
         title: title,
         body: body,
         notificationLayout: NotificationLayout.Default,
