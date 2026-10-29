@@ -129,7 +129,16 @@ class _MedicineDetailsScreenState extends State<MedicineDetailsScreen> {
               decoration: const BoxDecoration(shape: BoxShape.circle),
               clipBehavior: Clip.antiAlias,
               child: med.imagePath != null
-                  ? Image.file(File(med.imagePath!), fit: BoxFit.cover)
+                  ? Image.file(
+                      File(med.imagePath!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stack) => MedicineUtils.buildTypeIcon(
+                        context,
+                        med.type,
+                        size: 60,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    )
                   : MedicineUtils.buildTypeIcon(
                       context, 
                       med.type, 

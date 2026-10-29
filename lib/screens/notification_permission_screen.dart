@@ -39,9 +39,13 @@ class _NotificationPermissionScreenState extends State<NotificationPermissionScr
     setState(() => _isLoading = true);
     try {
       await NotificationService().requestPermissions();
-      // Re-check after request
-      if (mounted) {
-         _checkPermissions();
+      // Re-check after request; explain why it matters if the user denied
+      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+      if (!mounted) return;
+      if (isAllowed) {
+        _navigateToMain();
+      } else {
+        _navigateToPermissionRequired();
       }
     } finally {
       if (mounted) {

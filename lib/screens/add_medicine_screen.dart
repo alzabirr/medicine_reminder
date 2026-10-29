@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/utils/medicine_utils.dart';
@@ -115,7 +116,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
   DateTime get _calculatedEndDate {
     if (_selectedDuration == 'Pick Date') {
-      return _customEndDate ?? _startDate;
+      final custom = _customEndDate ?? _startDate;
+      // Start date may have been moved past the picked end date
+      return custom.isBefore(_startDate) ? _startDate : custom;
     }
     switch (_selectedDuration) {
       case '1 Week':
@@ -135,11 +138,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
 
   Future<void> _selectCustomEndDate(BuildContext context) async {
+    final lastDate = DateTime(_startDate.year + 5, _startDate.month, _startDate.day);
+    final initial = _customEndDate != null && !_customEndDate!.isBefore(_startDate)
+        ? _customEndDate!
+        : _startDate.add(const Duration(days: 1));
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _startDate.add(const Duration(days: 1)),
+      initialDate: initial.isAfter(lastDate) ? lastDate : initial,
       firstDate: _startDate,
-      lastDate: DateTime(2030),
+      lastDate: lastDate,
     );
     if (picked != null) {
       setState(() {
@@ -249,11 +256,22 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
   Future<void> _getImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await picker.pickImage(source: source, maxWidth: 1024, imageQuality: 85);
 
     if (pickedFile != null) {
+      // The picker returns a file in the cache dir, which the OS may clear.
+      // Copy it into app storage so the medicine photo doesn't disappear.
+      File image = File(pickedFile.path);
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final ext = pickedFile.path.contains('.') ? pickedFile.path.split('.').last : 'jpg';
+        image = await image.copy('${dir.path}/medicine_${DateTime.now().millisecondsSinceEpoch}.$ext');
+      } catch (e) {
+        debugPrint('Could not persist picked image: $e');
+      }
+      if (!mounted) return;
       setState(() {
-        _image = File(pickedFile.path);
+        _image = image;
       });
     }
   }
@@ -265,7 +283,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       context: context,
       initialDate: _startDate.isBefore(today) ? today : _startDate,
       firstDate: today,
-      lastDate: DateTime(2030),
+      lastDate: DateTime(today.year + 5, today.month, today.day),
     );
     if (picked != null && picked != _startDate) {
       setState(() {
@@ -512,7 +530,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     TextField(
                       controller: labelController,
                       decoration: InputDecoration(
-                        hintText: 'type your Does label',
+                        hintText: 'Type your dose label',
                         hintStyle: GoogleFonts.outfit(
                           color: AppTheme.textSecondary.withOpacity(0.5),
                         ),
@@ -630,17 +648,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             onPressed: () {
-                              if (labelController.text.trim().isEmpty) return;
+                              // ':' separates label and time in storage, so keep it out of labels
+                              final label = labelController.text.replaceAll(':', ' ').trim();
+                              if (label.isEmpty) return;
                               
                               setState(() {
                                 if (existingSlot != null && index != null) {
                                   _selectedTimeSlots[index] = DoseSlot(
-                                    label: labelController.text.trim(),
+                                    label: label,
                                     time: selectedTime,
                                   );
                                 } else {
                                   _selectedTimeSlots.add(DoseSlot(
-                                    label: labelController.text.trim(),
+                                    label: label,
                                     time: selectedTime,
                                   ));
                                 }

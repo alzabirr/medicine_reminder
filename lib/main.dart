@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:medi/core/theme.dart';
@@ -22,28 +23,24 @@ void main() async {
   await AwesomeNotifications().initialize(
     null, // default icon
     [
-      NotificationChannel(
-        channelGroupKey: 'basic_channel_group',
-        channelKey: 'basic_channel',
-        channelName: 'Basic Notifications',
-        channelDescription: 'Notification channel for medicine reminders',
-        defaultColor: const Color(0xFF9D50DD),
-        ledColor: Colors.white,
-        importance: NotificationImportance.Max,
-        channelShowBadge: true,
-        locked: true,
-        defaultRingtoneType: DefaultRingtoneType.Alarm,
-      )
+      NotificationService.buildChannel(channelKey: NotificationService.defaultChannelKey),
     ],
     // Channel groups are only visual and are optional
     channelGroups: [
       NotificationChannelGroup(
-        channelGroupKey: 'basic_channel_group',
+        channelGroupKey: NotificationService.channelGroupKey,
         channelGroupName: 'Basic group',
       )
     ],
-    debug: true,
+    debug: kDebugMode,
   );
+
+  // One-time cleanup of channels created by older versions
+  final settingsBox = Hive.box('settings');
+  if (settingsBox.get('channels_v2_migrated', defaultValue: false) != true) {
+    await NotificationService().removeLegacyChannels();
+    await settingsBox.put('channels_v2_migrated', true);
+  }
   
   final medicineProvider = MedicineProvider();
   // Init will load medicines and schedule notifications for cold start

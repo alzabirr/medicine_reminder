@@ -3,6 +3,7 @@ import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:medi/models/medicine.dart';
 import 'package:medi/services/database_service.dart';
 import 'package:medi/services/notification_service.dart';
+import 'package:medi/utils/medicine_utils.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:convert';
 
@@ -679,8 +680,9 @@ class MedicineProvider extends ChangeNotifier {
 
   Future<void> addMedicine(Medicine medicine) async {
     await _databaseService.addMedicine(medicine);
-    await refreshAllSchedules(); // Centralized scheduling
+    // Reload first so the new medicine is part of the schedule plan
     await loadMedicines();
+    await refreshAllSchedules(); // Centralized scheduling
   }
 
   // Soft Delete: Move to Trash
@@ -688,41 +690,33 @@ class MedicineProvider extends ChangeNotifier {
     final medicineIndex = _medicines.indexWhere((m) => m.id == id);
     if (medicineIndex != -1) {
        final medicine = _medicines[medicineIndex];
-       
-       // 1. Cancel notifications
-       await _cancelNotifications(medicine);
-       
-       // 2. Soft delete
+
+       // Soft delete
        medicine.isDeleted = true;
        await medicine.save();
     }
-    
+
     await loadMedicines();
+    // Removes this medicine's reminders
+    await refreshAllSchedules();
   }
 
   // Restore from Trash
   Future<void> restoreMedicine(Medicine medicine) async {
     medicine.isDeleted = false;
     await medicine.save();
-    
+
+    await loadMedicines();
+
     // Reschedule notifications
     await refreshAllSchedules();
-    
-    await loadMedicines();
   }
 
   // Hard Delete: Permanent Removal
   Future<void> deletePermanently(String id) async {
-    // Find it in full list to cancel notifications before database removal
-    try {
-      final medicine = _medicines.firstWhere((m) => m.id == id);
-      await _cancelNotifications(medicine);
-    } catch (_) {
-      // Already gone or not found, proceed to DB delete
-    }
-    
     await _databaseService.deleteMedicine(id);
     await loadMedicines();
+    await refreshAllSchedules();
   }
 
   Future<void> updateMedicine(Medicine medicine, {
@@ -735,10 +729,7 @@ class MedicineProvider extends ChangeNotifier {
     String? imagePath,
     int? frequency,
   }) async {
-    // 1. Cancel old notifications using OLD slots
-    await _cancelNotifications(medicine);
-
-    // 2. Update Medicine Object
+    // 1. Update Medicine Object
     medicine.name = name;
     medicine.type = type;
     medicine.timeSlots = timeSlots;
@@ -750,249 +741,246 @@ class MedicineProvider extends ChangeNotifier {
     
     await medicine.save();
 
-    // 3. Schedule New Notifications
+    // 2. Re-sync notifications (old slots are removed, new ones added)
+    await loadMedicines();
     await refreshAllSchedules();
-    
-    notifyListeners();
   }
 
-  Future<void> _cancelNotifications(Medicine medicine) async {
-    for (final slotString in medicine.timeSlots) {
-      final pivotIndex = slotString.indexOf(':');
-      final label = pivotIndex != -1 
-          ? slotString.substring(0, pivotIndex).trim() 
-          : slotString;
-      
-      final baseId = (medicine.id + label).hashCode;
-      
-      // Cancel standard daily/weekly
-      await _notificationService.cancelNotification(baseId);
-      
-      // Cancel individual occurrences (up to 90 days)
-      final DateTime now = DateTime.now();
-      final DateTime today = DateTime(now.year, now.month, now.day);
-      final DateTime start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
-      
-      // Iterate over the likely window we used to schedule
-      for (int i = 0; i <= 95; i++) {
-        // Normalize search date to midnight to match scheduling logic
-        final date = (today.isBefore(start) ? start : today.subtract(const Duration(days: 5))).add(Duration(days: i));
-        await _notificationService.cancelNotification((medicine.id + label + date.toIso8601String()).hashCode);
+  // ---------------------------------------------------------------------------
+  // Notification scheduling
+  //
+  // Every refresh builds the full list of reminders that *should* exist and
+  // diffs it against what is actually scheduled in the OS. This keeps the
+  // number of alarms under Android's per-app limit (500 – going over makes new
+  // alarms silently fail), never schedules dates in the past, and repairs any
+  // alarm the system dropped.
+  // ---------------------------------------------------------------------------
+
+  /// Keep well below Android's 500 concurrent alarm limit.
+  static const int _maxScheduledAlarms = 400;
+
+  /// How far ahead individual (non-repeating) reminders are scheduled.
+  /// The window rolls forward every time the app is opened.
+  static const int _scheduleWindowDays = 30;
+
+  Future<void> _scheduleChain = Future.value();
+
+  // Centralized Scheduling Logic. Calls are serialized so concurrent refreshes
+  // (startup, resume, edits) can never interleave and undo each other.
+  Future<void> refreshAllSchedules() {
+    final next = _scheduleChain.then((_) => _syncSchedules()).catchError((Object e) {
+      debugPrint('Error refreshing schedules: $e');
+    });
+    _scheduleChain = next;
+    return next;
+  }
+
+  Future<void> _syncSchedules() async {
+    if (!_notificationsEnabled) {
+      await AwesomeNotifications().cancelAllSchedules();
+      return;
+    }
+
+    final now = DateTime.now();
+    debugPrint('Refreshing all schedules at $now');
+
+    final planned = _buildReminderPlan(now);
+
+    List<NotificationModel> existing = [];
+    try {
+      existing = await _notificationService.listScheduled();
+    } catch (e) {
+      debugPrint('Could not list scheduled notifications: $e');
+    }
+
+    final Map<int, String?> existingSigs = {};
+    for (final model in existing) {
+      final id = model.content?.id;
+      if (id != null) existingSigs[id] = model.content?.payload?['sig'];
+    }
+
+    // 1. Remove schedules that are no longer wanted
+    final plannedIds = planned.map((r) => r.id).toSet();
+    for (final id in existingSigs.keys) {
+      if (!plannedIds.contains(id)) {
+        try {
+          await _notificationService.cancelSchedule(id);
+        } catch (e) {
+          debugPrint('Error cancelling schedule $id: $e');
+        }
       }
     }
-  }
 
-  // Centralized Scheduling Logic
-  Future<void> refreshAllSchedules({DateTime? baseTime}) async {
-    if (!_notificationsEnabled) return;
-    
-    final now = baseTime ?? DateTime.now();
-    debugPrint('Refeshing all schedules at $now');
-
-    // We could optimize by comparing checksums, but for now we'll just ensure 
-    // coverage for all active medicines.
-    // Note: To avoid duplicate alarms, awesome_notifications handles ID conflicts by replacing.
-    // However, for interval meds, we might want to clear old future ones first if we want to be strict.
-    // For simplicity and robustness: just trigger scheduling for each.
-    
-    for (final medicine in activeMedicines) {
-      // Clear previous schedules first to be safe
-      await _cancelNotifications(medicine);
-      await _scheduleNotifications(medicine, baseTime: now);
-    }
-  }
-
-  Future<void> _scheduleNotifications(Medicine medicine, {DateTime? baseTime}) async {
-    final now = baseTime ?? DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
-    
-    // 1. Check if medicine has already ended
-    if (medicine.endDate != null) {
-      final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day, 23, 59);
-      if (now.isAfter(end)) {
-        // Already ended, make sure it's canceled (already done in refreshAllSchedules, but good for direct calls)
-        await _cancelNotifications(medicine);
-        return;
-      }
-    }
-    
-    // 2. Schedule Window: Next 90 Days
-    const int scheduleWindowDays = 90;
-    
-    for (final slotString in medicine.timeSlots) {
+    // 2. Create missing or changed schedules
+    int created = 0;
+    for (final r in planned) {
+      if (existingSigs[r.id] == r.signature) continue;
       try {
-        final pivotIndex = slotString.indexOf(':');
-        if (pivotIndex == -1) continue; 
-        
-        final label = slotString.substring(0, pivotIndex).trim();
-        final timeStr = slotString.substring(pivotIndex + 1).trim(); 
-        
-        int hour = 8;
-        int minute = 0;
-        
-        final RegExp timeRegex = RegExp(r'(\d{1,2})[:\s\u00A0\u2007\u202F]+(\d{2})\s*(AM|PM|am|pm)?');
-        final match = timeRegex.firstMatch(timeStr);
-
-        if (match != null) {
-           int h = int.parse(match.group(1)!);
-           int m = int.parse(match.group(2)!);
-           final period = match.group(3)?.toLowerCase(); 
-
-           if (period == 'pm' && h != 12) h += 12;
-           if (period == 'am' && h == 12) h = 0;
-           
-           hour = h;
-           minute = m;
-        } else {
-             continue; 
-        }
-        
-        // Base Notification ID generated from MedicineID + SlotLabel
-        // usage: (base string).hashCode
-        final slotKey = medicine.id + label;
-
-        if (medicine.interval == 1) {
-          // Daily
-          if (medicine.endDate == null) {
-            // No end date: Use standard repeating notification
-            if (start.isAfter(today)) {
-              await _notificationService.scheduleNotification(
-                  id: slotKey.hashCode,
-                  title: 'Daily: ${medicine.name}',
-                  body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                  hour: hour,
-                  minute: minute,
-                  day: start,
-                  repeats: true,
-                  payload: {'medicineId': medicine.id},
-              );
-            } else {
-              await _notificationService.scheduleNotification(
-                  id: slotKey.hashCode,
-                  title: 'Daily: ${medicine.name}',
-                  body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                  hour: hour,
-                  minute: minute,
-                  repeats: true,
-                  payload: {'medicineId': medicine.id},
-              );
-            }
-          } else {
-            // Has end date: Schedule individual days to respect it
-             final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-             int daysLimit = end.difference(today).inDays;
-             if (daysLimit > scheduleWindowDays) daysLimit = scheduleWindowDays;
-             
-             for (int i = 0; i <= daysLimit; i++) {
-               final occurrenceDate = today.add(Duration(days: i));
-               if (occurrenceDate.isBefore(start)) continue;
-               if (occurrenceDate.isAfter(end)) break;
-               
-               await _notificationService.scheduleNotification(
-                 id: (slotKey + occurrenceDate.toIso8601String()).hashCode,
-                 title: 'Daily: ${medicine.name}',
-                 body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                 hour: hour,
-                 minute: minute,
-                 day: occurrenceDate,
-                 repeats: false,
-                 payload: {'medicineId': medicine.id},
-               );
-             }
-          }
-          
-        } else if (medicine.interval == 7) {
-          // Weekly
-          if (medicine.endDate == null) {
-            await _notificationService.scheduleNotification(
-              id: slotKey.hashCode,
-              title: 'Weekly: ${medicine.name}',
-              body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-              hour: hour,
-              minute: minute,
-              weekday: start.weekday,
-              repeats: true,
-              payload: {'medicineId': medicine.id},
-            );
-          } else {
-             // Has end date: Schedule individual weeks
-             final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-             for (int i = 0; i < (scheduleWindowDays / 7).ceil(); i++) {
-               final occurrenceDate = start.add(Duration(days: i * 7));
-               if (occurrenceDate.isBefore(today)) continue;
-               if (occurrenceDate.isAfter(end)) break;
-               
-               await _notificationService.scheduleNotification(
-                 id: (slotKey + occurrenceDate.toIso8601String()).hashCode,
-                 title: 'Weekly: ${medicine.name}',
-                 body: 'Your weekly dose is due ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-                 hour: hour,
-                 minute: minute,
-                 day: occurrenceDate,
-                 repeats: false,
-                 payload: {'medicineId': medicine.id},
-               );
-             }
-          }
-        } else {
-          // Interval (Every X Days) - Rolling Window Logic
-          
-          // Calculate first valid occurrence relative to START date
-          // We need to find occurrences within [now, now + 90 days]
-          
-          final daysDesdeStart = today.difference(start).inDays;
-          
-          // Start iterating from a point that covers "today" or "future start"
-          // If daysDesdeStart < 0 (Future start), we start from 0 (Start Date)
-          // If daysDesdeStart >= 0, we find the next multiple of interval
-          
-          int startOffset = 0;
-          if (daysDesdeStart >= 0) {
-             final remainder = daysDesdeStart % medicine.interval;
-             if (remainder == 0) {
-               startOffset = daysDesdeStart; // Today is a dose day
-             } else {
-               startOffset = daysDesdeStart + (medicine.interval - remainder); // Next dose day
-             }
-          }
-          
-          // Now iterate forward for 90 days
-          for (int dayOffset = startOffset; ; dayOffset += medicine.interval) {
-             // Safety break if we drift too far backwards (unlikely)
-             if (dayOffset < daysDesdeStart && daysDesdeStart > 90) break; // Should not happen with logic above
-             
-             final occurrenceDate = start.add(Duration(days: dayOffset));
-             
-             // Stop if we exceed the window
-             if (occurrenceDate.difference(today).inDays > scheduleWindowDays) break;
-             
-             // Stop if we exceed End Date
-             if (medicine.endDate != null) {
-                final end = DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day);
-                if (occurrenceDate.isAfter(end)) break;
-             }
-             
-             // Unique ID for this specific occurrence: MedId + Slot + DateString
-             final occurrenceId = (slotKey + occurrenceDate.toIso8601String()).hashCode;
-             
-             await _notificationService.scheduleNotification(
-              id: occurrenceId,
-              title: 'Medi: ${medicine.name}',
-              body: 'Time for your dose ${medicine.instruction != null ? ' • ' + medicine.instruction! : ''}',
-              hour: hour,
-              minute: minute,
-              day: occurrenceDate,
-              repeats: false,
-              payload: {'medicineId': medicine.id},
-            );
-          }
-        }
-        
+        await _notificationService.scheduleNotification(
+          id: r.id,
+          title: r.title,
+          body: r.body,
+          hour: r.hour,
+          minute: r.minute,
+          weekday: r.weekday,
+          day: r.day,
+          repeats: r.repeats,
+          payload: {'medicineId': r.medicineId, 'sig': r.signature},
+        );
+        created++;
       } catch (e) {
-        debugPrint('Error scheduling notification: $e');
+        debugPrint('Error scheduling notification ${r.id}: $e');
       }
     }
+    debugPrint('Schedules synced: ${planned.length} planned, $created (re)created');
+  }
+
+  List<_PlannedReminder> _buildReminderPlan(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final windowEnd = DateTime(today.year, today.month, today.day + _scheduleWindowDays);
+    final channel = _notificationService.currentChannelKey;
+
+    final List<_PlannedReminder> repeating = [];
+    final List<_PlannedReminder> oneOff = [];
+
+    for (final medicine in activeMedicines) {
+      final start = DateTime(medicine.startTime.year, medicine.startTime.month, medicine.startTime.day);
+      final end = medicine.endDate != null
+          ? DateTime(medicine.endDate!.year, medicine.endDate!.month, medicine.endDate!.day)
+          : null;
+
+      // Already finished
+      if (end != null && end.isBefore(today)) continue;
+
+      final interval = medicine.interval < 1 ? 1 : medicine.interval;
+      final prefix = interval == 1 ? 'Daily' : (interval == 7 ? 'Weekly' : 'Medi');
+      final title = '$prefix: ${medicine.name}';
+
+      // Unique times only: two slots at the same minute would be one alarm anyway
+      final Map<String, ({String label, TimeOfDay time})> slots = {};
+      for (final slotString in medicine.timeSlots) {
+        final parsed = MedicineUtils.parseSlot(slotString);
+        if (parsed == null) {
+          debugPrint('Skipping unparseable time slot "$slotString" of ${medicine.name}');
+          continue;
+        }
+        slots.putIfAbsent('${parsed.time.hour}:${parsed.time.minute}', () => parsed);
+      }
+
+      for (final slot in slots.values) {
+        final hour = slot.time.hour;
+        final minute = slot.time.minute;
+        final body = [
+          slot.label.isNotEmpty ? '${slot.label} dose' : 'Time for your dose',
+          if (medicine.instruction != null && medicine.instruction!.isNotEmpty) medicine.instruction!,
+        ].join(' • ');
+        final hhmm = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+
+        // A single repeating alarm is used when the course has already started
+        // and doesn't end within the window. Once the end date falls inside
+        // the window (on a later refresh) it switches to individual alarms.
+        final canRepeat = (interval == 1 || interval == 7) &&
+            !start.isAfter(today) &&
+            (end == null || end.isAfter(windowEnd));
+
+        if (canRepeat) {
+          final weekday = interval == 7 ? start.weekday : null;
+          final key = '${medicine.id}|repeat|$interval|$hhmm';
+          repeating.add(_PlannedReminder(
+            id: _stableId(key),
+            signature: _stableHash('$key|$title|$body|$channel|${weekday ?? ''}').toRadixString(16),
+            medicineId: medicine.id,
+            title: title,
+            body: body,
+            hour: hour,
+            minute: minute,
+            weekday: weekday,
+            repeats: true,
+            fireAt: _nextOccurrence(now, hour, minute, weekday),
+          ));
+          continue;
+        }
+
+        for (var date = start.isAfter(today) ? start : today;
+            !date.isAfter(windowEnd) && (end == null || !date.isAfter(end));
+            date = DateTime(date.year, date.month, date.day + 1)) {
+          if (!_isDoseDay(date, start, interval)) continue;
+
+          final fireAt = DateTime(date.year, date.month, date.day, hour, minute);
+          if (!fireAt.isAfter(now)) continue; // never schedule in the past
+          if (_isDoseTaken(medicine, fireAt)) continue; // already marked as taken
+
+          final dateKey = '${date.year}-${date.month}-${date.day}';
+          final key = '${medicine.id}|$dateKey|$hhmm';
+          oneOff.add(_PlannedReminder(
+            id: _stableId(key),
+            signature: _stableHash('$key|$title|$body|$channel').toRadixString(16),
+            medicineId: medicine.id,
+            title: title,
+            body: body,
+            hour: hour,
+            minute: minute,
+            day: date,
+            repeats: false,
+            fireAt: fireAt,
+          ));
+        }
+      }
+    }
+
+    // Respect the alarm budget: nearest reminders win, the rest get scheduled
+    // on a later refresh as the window moves forward.
+    oneOff.sort((a, b) => a.fireAt.compareTo(b.fireAt));
+    final budget = _maxScheduledAlarms - repeating.length;
+    final plan = [...repeating, ...oneOff.take(budget < 0 ? 0 : budget)];
+
+    // Guard against (extremely unlikely) ID collisions
+    final seen = <int>{};
+    return plan.where((r) => seen.add(r.id)).toList();
+  }
+
+  static bool _isDoseDay(DateTime date, DateTime start, int interval) {
+    if (interval == 1) return true;
+    if (interval == 7) return date.weekday == start.weekday;
+    // Count days in UTC so DST transitions don't shift the cycle
+    final days = DateTime.utc(date.year, date.month, date.day)
+        .difference(DateTime.utc(start.year, start.month, start.day))
+        .inDays;
+    return days >= 0 && days % interval == 0;
+  }
+
+  static bool _isDoseTaken(Medicine medicine, DateTime fireAt) {
+    return medicine.takenHistory.any((dt) =>
+        dt.year == fireAt.year &&
+        dt.month == fireAt.month &&
+        dt.day == fireAt.day &&
+        dt.hour == fireAt.hour &&
+        dt.minute == fireAt.minute);
+  }
+
+  static DateTime _nextOccurrence(DateTime now, int hour, int minute, int? weekday) {
+    var candidate = DateTime(now.year, now.month, now.day, hour, minute);
+    while (!candidate.isAfter(now) || (weekday != null && candidate.weekday != weekday)) {
+      candidate = DateTime(candidate.year, candidate.month, candidate.day + 1, hour, minute);
+    }
+    return candidate;
+  }
+
+  /// FNV-1a: unlike String.hashCode it is identical across app runs and
+  /// Dart versions, so IDs stay stable between refreshes and app updates.
+  static int _stableHash(String input) {
+    int hash = 0x811c9dc5;
+    for (final unit in utf8.encode(input)) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
+  }
+
+  /// Positive, non-zero 31-bit notification id.
+  static int _stableId(String key) {
+    final id = _stableHash(key) & 0x7FFFFFFF;
+    return id == 0 ? 1 : id;
   }
 
   Future<void> toggleTaken(Medicine medicine, {DateTime? date, String? timeSlot}) async {
@@ -1060,20 +1048,18 @@ class MedicineProvider extends ChangeNotifier {
     
     // Explicitly refresh from database
     await loadMedicines();
+
+    // Skip the reminder for a dose marked as taken early (or restore it)
+    await refreshAllSchedules();
   }
 
-  void toggleNotifications() async {
+  Future<void> toggleNotifications() async {
     _notificationsEnabled = !_notificationsEnabled;
     await _saveNotificationPreferences();
     notifyListeners();
-    
-    if (!_notificationsEnabled) {
-      // Cancel everything
-      await AwesomeNotifications().cancelAllSchedules();
-    } else {
-      // Reschedule all active medicines
-      await refreshAllSchedules();
-    }
+
+    // Cancels everything when disabled, reschedules when enabled
+    await refreshAllSchedules();
   }
 
   Future<void> setNotificationSound(String soundPath) async {
@@ -1235,4 +1221,32 @@ class MedicineProvider extends ChangeNotifier {
     final box = await Hive.openBox('settings');
     await box.put('emergencyContacts', jsonEncode(_emergencyContacts));
   }
+}
+
+class _PlannedReminder {
+  final int id;
+  final String signature;
+  final String medicineId;
+  final String title;
+  final String body;
+  final int hour;
+  final int minute;
+  final int? weekday;
+  final DateTime? day;
+  final bool repeats;
+  final DateTime fireAt;
+
+  const _PlannedReminder({
+    required this.id,
+    required this.signature,
+    required this.medicineId,
+    required this.title,
+    required this.body,
+    required this.hour,
+    required this.minute,
+    this.weekday,
+    this.day,
+    required this.repeats,
+    required this.fireAt,
+  });
 }

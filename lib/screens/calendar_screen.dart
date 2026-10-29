@@ -54,7 +54,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(title: const Text('Schedule')),
       body: Consumer<MedicineProvider>(
         builder: (context, provider, child) {
-          final medicinesForSelectedDay = _getMedicinesForDay(_selectedDay, provider.medicines);
+          final medicinesForSelectedDay = _getMedicinesForDay(_selectedDay, provider.activeMedicines);
 
           return Column(
             children: [
@@ -86,7 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
                 eventLoader: (day) {
-                  return _getMedicinesForDay(day, provider.medicines);
+                  return _getMedicinesForDay(day, provider.activeMedicines);
                 },
               ),
               const SizedBox(height: 8),

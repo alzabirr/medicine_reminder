@@ -4,12 +4,31 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:medi/providers/medicine_provider.dart';
 import 'package:medi/screens/medicine_details_screen.dart';
-import 'package:medi/models/medicine.dart';
 
 class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  static String _currentChannelKey = 'basic_channel';
-  
+
+  // Channel keys are versioned: Android channels can't change their sound after
+  // creation, so a fresh key guarantees the current sound config is applied.
+  static const String defaultChannelKey = 'medi_reminder_v2_default';
+  static const String channelGroupKey = 'basic_channel_group';
+  static String _currentChannelKey = defaultChannelKey;
+  String get currentChannelKey => _currentChannelKey;
+
+  // Channels created by older versions of the app.
+  static const List<String> _legacyChannelKeys = [
+    'basic_channel',
+    'basic_channel_default',
+    'basic_channel_notification_gentle',
+    'basic_channel_notification_chime',
+    'basic_channel_notification_soft',
+    'basic_channel_notification_knock',
+    'basic_channel_notification_playful',
+    'basic_channel_notification_reminder',
+    'basic_channel_death_note',
+    'basic_channel_suzume_no_tojimari',
+  ];
+
   // Singleton pattern not strictly necessary if used via Provider, but good practice
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -24,47 +43,62 @@ class NotificationService {
     );
   }
 
+  static NotificationChannel buildChannel({required String channelKey, String? soundSource}) {
+    return NotificationChannel(
+      channelGroupKey: channelGroupKey,
+      channelKey: channelKey,
+      channelName: 'Medicine Reminders',
+      channelDescription: 'Notifications for your scheduled medicines',
+      defaultColor: const Color(0xFF9D50DD),
+      ledColor: Colors.white,
+      importance: NotificationImportance.Max,
+      channelShowBadge: true,
+      locked: true,
+
+      enableVibration: true,
+      defaultRingtoneType: DefaultRingtoneType.Notification,
+      soundSource: soundSource,
+      playSound: true,
+    );
+  }
+
   /// Updates the notification channel with the specified sound
   Future<void> updateNotificationChannel(String soundPath) async {
     String? soundSource;
-    String newChannelKey = 'basic_channel';
-    
-    if (soundPath == 'default') {
-      soundSource = null; // Use default system sound
-      newChannelKey = 'basic_channel_default';
-    } else if (soundPath.startsWith('assets/')) {
-      // Bundled asset: Use resource://raw/ approach
+    String newChannelKey = defaultChannelKey;
+
+    if (soundPath.startsWith('assets/')) {
+      // Bundled asset: the same file lives in android/app/src/main/res/raw
       final String fileName = soundPath.split('/').last;
       final String resourceName = fileName.split('.').first;
       soundSource = 'resource://raw/$resourceName';
-      newChannelKey = 'basic_channel_$resourceName';
-    } else {
-      // Fallback for unknown paths
+      newChannelKey = 'medi_reminder_v2_$resourceName';
+    } else if (soundPath != 'default') {
       debugPrint('Warning: Unknown sound path type: $soundPath. Reverting to default.');
-      soundSource = null;
-      newChannelKey = 'basic_channel_default';
     }
 
-    await AwesomeNotifications().setChannel(
-      NotificationChannel(
-        channelGroupKey: 'basic_channel_group',
-        channelKey: newChannelKey,
-        channelName: 'Medicine Reminders',
-        channelDescription: 'Notifications for your scheduled medicines',
-        defaultColor: const Color(0xFF9D50DD),
-        ledColor: Colors.white,
-        importance: NotificationImportance.Max,
-        channelShowBadge: true,
-        locked: true,
-        defaultRingtoneType: DefaultRingtoneType.Notification,
-        soundSource: soundSource,
-        playSound: true,
-      ),
-      forceUpdate: true,
-    );
-    
-    _currentChannelKey = newChannelKey;
-    debugPrint('Notification Channel Updated to: $newChannelKey with sound: $soundSource');
+    try {
+      await AwesomeNotifications().setChannel(
+        buildChannel(channelKey: newChannelKey, soundSource: soundSource),
+      );
+      _currentChannelKey = newChannelKey;
+    } catch (e) {
+      // Never leave reminders without a working channel
+      debugPrint('Failed to set channel $newChannelKey: $e');
+      _currentChannelKey = defaultChannelKey;
+    }
+    debugPrint('Notification Channel Updated to: $_currentChannelKey with sound: $soundSource');
+  }
+
+  /// Removes channels left over from older app versions (one-time cleanup).
+  Future<void> removeLegacyChannels() async {
+    for (final key in _legacyChannelKeys) {
+      try {
+        await AwesomeNotifications().removeChannel(key);
+      } catch (_) {
+        // Channel didn't exist
+      }
+    }
   }
 
   /// Use this method to detect when a new notification or a schedule is created
@@ -90,14 +124,14 @@ class NotificationService {
   static Future <void> onActionReceivedMethod(ReceivedAction receivedAction) async {
     debugPrint("=== Notification Action Received ===");
     debugPrint("Action ID: ${receivedAction.id}");
-    
+
     final payload = receivedAction.payload;
     if (payload != null && payload.containsKey('medicineId')) {
       final medicineId = payload['medicineId'];
-      
+
       // Instead of a fixed delay, we'll wait for the navigator to be available
       int retryCount = 0;
-      while (navigatorKey.currentContext == null && retryCount < 10) {
+      while (navigatorKey.currentContext == null && retryCount < 25) {
         await Future.delayed(const Duration(milliseconds: 200));
         retryCount++;
       }
@@ -106,7 +140,7 @@ class NotificationService {
       if (context != null) {
         try {
           final provider = Provider.of<MedicineProvider>(context, listen: false);
-          
+
           // Ensure provider is initialized
           if (provider.isLoading) {
              await provider.loadMedicines();
@@ -116,9 +150,9 @@ class NotificationService {
             (m) => m.id == medicineId,
             orElse: () => throw Exception("Medicine not found"),
           );
-          
+
           debugPrint("Navigating to details for: ${medicine.name}");
-          
+
           navigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => MedicineDetailsScreen(medicine: medicine),
@@ -151,7 +185,7 @@ class NotificationService {
       );
       if (!userGranted) {
         // user denied basic notifications
-        return []; 
+        return [NotificationPermission.Alert];
       }
     }
 
@@ -160,8 +194,18 @@ class NotificationService {
     if (await Permission.scheduleExactAlarm.isDenied) {
         missingPermissions.add(NotificationPermission.PreciseAlarms);
     }
-    
+
     return missingPermissions;
+  }
+
+  /// Battery optimization (Doze / OEM task killers) is the most common reason
+  /// scheduled reminders get delayed or dropped on Android.
+  Future<bool> isBatteryOptimizationActive() async {
+    try {
+      return !(await Permission.ignoreBatteryOptimizations.isGranted);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> scheduleNotification({
@@ -173,13 +217,8 @@ class NotificationService {
     int? weekday, // 1-7 (Mon-Sun)
     DateTime? day, // Specific day
     bool repeats = true,
-    bool playSound = true, // Keep parameter for API consistency
     Map<String, String>? payload,
   }) async {
-    
-    // Note: Sound is controlled at channel level in awesome_notifications
-    // The playSound parameter is kept for API consistency but not used here
-    
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: id,
@@ -190,7 +229,7 @@ class NotificationService {
         category: NotificationCategory.Alarm,
         wakeUpScreen: true,
         fullScreenIntent: true,
-        autoDismissible: false,
+        autoDismissible: true,
         backgroundColor: Colors.deepPurple,
         payload: payload,
       ),
@@ -203,11 +242,20 @@ class NotificationService {
         minute: minute,
         second: 0,
         millisecond: 0,
-        repeats: repeats, 
+        repeats: repeats,
         allowWhileIdle: true,
         preciseAlarm: true,
       ),
     );
+  }
+
+  Future<List<NotificationModel>> listScheduled() {
+    return AwesomeNotifications().listScheduledNotifications();
+  }
+
+  /// Cancels only the future schedule; a reminder already in the tray stays.
+  Future<void> cancelSchedule(int id) async {
+    await AwesomeNotifications().cancelSchedule(id);
   }
 
   Future<void> cancelNotification(int id) async {

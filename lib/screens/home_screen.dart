@@ -23,16 +23,26 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   CalendarFormat _calendarFormat = CalendarFormat.week; // Default to week view
+
+  // HomeScreen is rebuilt when switching tabs; only prompt once per app run
+  static bool _permissionsChecked = false;
   
   @override
   void initState() {
     super.initState();
     // Request permissions after UI is built
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_permissionsChecked) return;
+      _permissionsChecked = true;
+
       final notificationService = Provider.of<MedicineProvider>(context, listen: false).notificationService;
       final missingPermissions = await notificationService.requestPermissions();
+      if (missingPermissions.contains(NotificationPermission.Alert)) return; // notifications denied
+
+      final needsExactAlarm = missingPermissions.contains(NotificationPermission.PreciseAlarms);
+      final needsBatteryExemption = await notificationService.isBatteryOptimizationActive();
       
-      if (missingPermissions.contains(NotificationPermission.PreciseAlarms) && mounted) {
+      if ((needsExactAlarm || needsBatteryExemption) && mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -106,7 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
                          child: GestureDetector(
                            onTap: () async {
                               Navigator.pop(context);
-                              await Permission.scheduleExactAlarm.request();
+                              if (needsExactAlarm) {
+                                await Permission.scheduleExactAlarm.request();
+                              }
+                              // Stops the OS from delaying/killing reminder alarms
+                              if (needsBatteryExemption) {
+                                await Permission.ignoreBatteryOptimizations.request();
+                              }
                            },
                            child: NeumorphicContainer(
                              padding: const EdgeInsets.symmetric(vertical: 16),

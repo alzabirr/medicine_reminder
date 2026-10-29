@@ -71,8 +71,11 @@ class _MedicineCardState extends State<MedicineCard> {
     
     final startAtMidnight = DateTime(widget.medicine.startTime.year, widget.medicine.startTime.month, widget.medicine.startTime.day);
     final displayDay = targetDay.difference(startAtMidnight).inDays + 1;
-    final totalDays = widget.medicine.endDate != null 
-        ? widget.medicine.endDate!.difference(startAtMidnight).inDays + 1
+    // At least 1: an end date before the start date must not crash clamp()
+    final totalDays = widget.medicine.endDate != null
+        ? (DateTime(widget.medicine.endDate!.year, widget.medicine.endDate!.month, widget.medicine.endDate!.day)
+                    .difference(startAtMidnight).inDays + 1)
+            .clamp(1, 100000)
         : 1;
     final displayDayClamped = displayDay.clamp(1, totalDays);
 
@@ -134,7 +137,18 @@ class _MedicineCardState extends State<MedicineCard> {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: widget.medicine.imagePath != null
-                              ? Image.file(File(widget.medicine.imagePath!), fit: BoxFit.cover)
+                              ? Image.file(
+                                  File(widget.medicine.imagePath!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stack) => Center(
+                                    child: MedicineUtils.buildTypeIcon(
+                                      context,
+                                      widget.medicine.type,
+                                      size: 16,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                )
                               : Center(
                                   child: MedicineUtils.buildTypeIcon(
                                     context, 

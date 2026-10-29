@@ -32,6 +32,16 @@ class MedicineUtils {
     return null;
   }
 
+  /// Splits a stored slot like "Morning: 8:00 AM" into its label and time.
+  /// The time part never contains ": ", so the last occurrence separates them.
+  static ({String label, TimeOfDay time})? parseSlot(String slot) {
+    final sep = slot.lastIndexOf(': ');
+    final label = sep != -1 ? slot.substring(0, sep).trim() : '';
+    final time = parseTime(sep != -1 ? slot.substring(sep + 2) : slot);
+    if (time == null || time.hour > 23 || time.minute > 59) return null;
+    return (label: label, time: time);
+  }
+
   /// Returns the Duration until the next scheduled dose.
   /// For future medicines (start date in the future), returns time until start date.
   /// For current medicines, returns time until the next dose today/tomorrow.

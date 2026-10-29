@@ -47,6 +47,7 @@ class DatabaseService {
             timeSlots: medicine.timeSlots,
             instruction: medicine.instruction,
             endDate: medicine.endDate,
+            isDeleted: medicine.isDeleted,
           );
           
           // Delete old and add fixed
